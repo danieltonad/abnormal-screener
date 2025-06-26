@@ -1,11 +1,13 @@
 import os
 from dotenv import load_dotenv
+from httpx import AsyncClient
+
 load_dotenv(override=True)
 
 
 class Settings:
-
-    CRYPTO_SCREENER_URL = "https://api.binance.com/api/v3/klines"
+    CRYPTO_PAIR: str = "USD"
+    CRYPTO_SCREENER_URL = "https://scanner.tradingview.com/crypto/scan?label-product=screener-crypto-cex"
     TDV_SCREENER_HEADER: dict = {
         "Accept": "*/*",
         "Accept-Encoding": "gzip, deflate, br, zstd",
@@ -24,5 +26,17 @@ class Settings:
         "X-Language": "en",
         "X-Requested-With": "XMLHttpRequest"
     }
+
+    SESSION: AsyncClient = AsyncClient(
+        headers=TDV_SCREENER_HEADER,
+        timeout=30.0,
+        follow_redirects=True
+    )
+
+    CRYPTO_STABLE_COIN: list = ["USDT", "USDC", "DAI", "DIA","BUSD", "TUSD", "GUSD", "PAX", "FRAX", "MIM", "USTC", "LUSD", "USDP", "USDD", "EURS", "SUSD", "ALUSD", "CUSD", "USDE", "PYUSD", "SHILL", "USDY"]
+    
+    
+    def crypto_stable_symbol_list(self) -> set:
+        return set([f"{coin}{self.CRYPTO_PAIR}" for coin in settings.CRYPTO_STABLE_COIN])
 
 settings = Settings()
