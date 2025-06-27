@@ -11,44 +11,6 @@ async def double_ema_list(left: int, right: int, timeframe: TradeTimeFrame, side
     operation = "crosses_above" if side == TradeSide.LONG else "crosses_below" if side == TradeSide.SHORT else ""
     return await __response_list(payload=double_ema_paylod(left, right, timeframe, operation))
 
-async def double_ema_trend_list(left: int, right: int, timeframe: TradeTimeFrame, side: TradeSide):
-    operation = "greater" if side == TradeSide.LONG else "less" if side == TradeSide.SHORT else ""
-    assets: list = await __response_list(payload=double_ema_paylod(left, right, timeframe, operation))
-    return assets
-
-async def double_ema_signal(symbol: str, left: int, right: int, timeframe: TradeTimeFrame):
-    long = await __response_meet_criteria(symbol, double_ema_paylod(left, right, timeframe, "crosses_above"))
-    if long:
-        return TradeSide.LONG
-    short = await __response_meet_criteria(symbol, double_ema_paylod(left, right, timeframe, "crosses_below"))
-    if short:
-        return TradeSide.SHORT
-    return TradeSide.NEUTRAL
-
-async def double_ema_trend_signal(symbol: str, left: int, right: int, timeframe: TradeTimeFrame):
-    long = await __response_meet_criteria(symbol, double_ema_paylod(left, right, timeframe, "greater"))
-    if long:
-        return TradeSide.LONG
-    short = await __response_meet_criteria(symbol, double_ema_paylod(left, right, timeframe, "less"))
-    if short:
-        return TradeSide.SHORT
-    return TradeSide.NEUTRAL
-
-async def __response_meet_criteria(symbol: str, payload):
-    try:
-        res = await settings.SESSION.post(url=settings.CRYPTO_SCREENER_URL, data=payload)
-        if res.status_code != 200:
-            return False
-        result: dict = res.json()
-        for dt in result.get("data"):
-            exchange, ticker = (dt.get("s", "").split(":"))
-            if symbol.upper() == ticker.upper():
-                return True
-        return False
-    except Exception as err:
-        await Logger.app_log(title="CRYPTO_EMA_ERR", message=f"{symbol} - {str(err)}")
-        return False
-
 async def __response_list(payload):
     try:
         res = await settings.SESSION.post(url=settings.CRYPTO_SCREENER_URL, data=payload)

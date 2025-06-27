@@ -7,10 +7,17 @@ app = FastAPI()
 async def startup_event():
     from enums.trade import TradeTimeFrame, TradeSide
     from screeners.crypto.ema import double_ema_list
+    from screeners.crypto.reversal import reversal_list
 
-    data = await double_ema_list(left=5, right=10, timeframe=TradeTimeFrame.ONE_MIN, side=TradeSide.LONG)
-    # data += await double_ema_list(left=5, right=10, timeframe=TradeTimeFrame.ONE_MIN, side=TradeSide.SHORT)
-    print(f"Double EMA List: {data}")
+    # long = await double_ema_list(left=5, right=10, timeframe=TradeTimeFrame.ONE_MIN, side=TradeSide.LONG)
+    # short = await double_ema_list(left=5, right=10, timeframe=TradeTimeFrame.ONE_MIN, side=TradeSide.SHORT)
+    # print(f"LONG EMA List: {long} \n\n")
+    # print(f"SHORT EMA List: {short}")
+
+    long = await reversal_list(timeframe=TradeTimeFrame.ONE_MIN, side=TradeSide.LONG)
+    short = await reversal_list(timeframe=TradeTimeFrame.ONE_MIN, side=TradeSide.SHORT)
+    print(f"LONG EMA List: {long} \n\n")
+    print(f"SHORT EMA List: {short}")
 
 
 @app.on_event("shutdown")
