@@ -8,6 +8,8 @@ load_dotenv(override=True)
 class Settings:
     CRYPTO_PAIR: str = "USD"
     CRYPTO_SCREENER_URL = "https://scanner.tradingview.com/crypto/scan?label-product=screener-crypto-cex"
+    STOCKS_SCREENER_URL = "https://scanner.tradingview.com/america/scan?label-product=screener-stocks"
+    ETF_SCREENER_URL = "https://scanner.tradingview.com/america/scan?label-product=screener-etf"
     TDV_SCREENER_HEADER: dict = {
         "Accept": "*/*",
         "Accept-Encoding": "gzip, deflate, br, zstd",
