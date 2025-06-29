@@ -44,3 +44,18 @@ class TradeTimeFrame(Enum):
         TradeTimeFrame.ONE_MONTH: '|1M'
         }
         return timeframe_to_period.get(self)
+    
+    def timeframe_sleep(self):
+        timeframe_to_sleep = {
+            TradeTimeFrame.ONE_MIN: 60,
+            TradeTimeFrame.FIVE_MIN: 300,
+            TradeTimeFrame.FIFTEEN_MIN: 900,
+            TradeTimeFrame.THIRTY_MIN: 1800,
+            TradeTimeFrame.ONE_HOUR: 3600,
+            TradeTimeFrame.TWO_HOURS: 7200,
+            TradeTimeFrame.FOUR_HOURS: 14400,
+            TradeTimeFrame.ONE_DAY: 86400,
+            TradeTimeFrame.ONE_WEEK: 604800,
+            TradeTimeFrame.ONE_MONTH: 2592000
+        }
+        return timeframe_to_sleep.get(self, 60)

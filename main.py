@@ -1,29 +1,51 @@
 from fastapi import FastAPI
 from settings import settings
+from asyncio import sleep, create_task
+from enums.trade import TradeTimeFrame, TradeSide
 
 app = FastAPI()
 
-@app.on_event("startup")
-async def startup_event():
-    import json
-    from asyncio import sleep
-    from enums.trade import TradeTimeFrame, TradeSide
-    from screeners.crypto.ema import double_ema_list
-    # from screeners.crypto.reversal import reversal_list
-    from screeners.stocks.reversal import reversal_list
-    # from screeners.etfs.reversal import reversal_list
 
-    # long = await double_ema_list(left=10, right=20, timeframe=TradeTimeFrame.ONE_MIN, side=TradeSide.LONG)
-    # short = await double_ema_list(left=10, right=20, timeframe=TradeTimeFrame.ONE_MIN, side=TradeSide.SHORT)
-    # print(f"LONG EMA List: {long} \n\n")
-    # print(f"SHORT EMA List: {short}")
+async def crypto_ema_monitor(timeframe: TradeTimeFrame):
+    from screeners.crypto.ema import double_ema_list
 
     while True:
-        long = await reversal_list(timeframe=TradeTimeFrame.ONE_MIN, side=TradeSide.LONG)
-        short = await reversal_list(timeframe=TradeTimeFrame.ONE_MIN, side=TradeSide.SHORT)
-        print(f"LONG EMA List: {long} \n\n")
-        print(f"SHORT EMA List: {short}")
-        await sleep(55)  # Sleep for 60 seconds before the next iteration
+        long = await double_ema_list(left=10, right=20, timeframe=timeframe, side=TradeSide.LONG)
+        short = await double_ema_list(left=10, right=20, timeframe=timeframe, side=TradeSide.SHORT)
+        print(f"CRYPTO LONG EMA List: {long} \n\n")
+        print(f"CRYPTO SHORT EMA List: {short}")
+
+        await sleep(timeframe.timeframe_sleep())  # Sleep for the specified timeframe duration
+
+
+async def stocks_ema_monitor(timeframe: TradeTimeFrame):
+    from screeners.stocks.ema import double_ema_list
+
+    while True:
+        long = await double_ema_list(left=10, right=20, timeframe=timeframe, side=TradeSide.LONG)
+        short = await double_ema_list(left=10, right=20, timeframe=timeframe, side=TradeSide.SHORT)
+        print(f"STOCKS LONG EMA List: {long} \n\n")
+        print(f"STOCKS SHORT EMA List: {short}")
+
+        await sleep(timeframe.timeframe_sleep())  # Sleep for the specified timeframe duration
+
+
+async def etf_ema_monitor(timeframe: TradeTimeFrame):
+    from screeners.etfs.ema import double_ema_list
+
+    while True:
+        long = await double_ema_list(left=10, right=20, timeframe=timeframe, side=TradeSide.LONG)
+        short = await double_ema_list(left=10, right=20, timeframe=timeframe, side=TradeSide.SHORT)
+        print(f"ETFS LONG EMA List: {long} \n\n")
+        print(f"ETFS SHORT EMA List: {short}")
+
+        await sleep(timeframe.timeframe_sleep())  # Sleep for the specified timeframe duration
+
+@app.on_event("startup")
+async def startup_event():
+    create_task(crypto_ema_monitor(TradeTimeFrame.ONE_MIN))
+    create_task(stocks_ema_monitor(TradeTimeFrame.ONE_MIN))
+    create_task(etf_ema_monitor(TradeTimeFrame.ONE_MIN))
 
 
 @app.on_event("shutdown")
