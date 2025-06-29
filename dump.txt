@@ -1,0 +1,21 @@
+etf_equivalents = {
+    "US500": "SPY",     # S&P 500 Index -> SPDR S&P 500 ETF
+    "US100": "QQQ",     # Nasdaq-100 Index -> Invesco QQQ Trust
+    "US30": "DIA",      # Dow Jones Industrial Average -> SPDR Dow Jones ETF
+    "GOLD": "GLD"       # Spot Gold -> SPDR Gold Shares
+}
+
+
+commodity_etf_equivalents = {
+    "GOLD": "GLD",       # Gold -> SPDR Gold Shares
+    "SILVER": "SLV",     # Silver -> iShares Silver Trust
+    "OIL": "USO",        # Crude Oil -> United States Oil Fund (tracks WTI futures)
+    "NATGAS": "UNG",     # Natural Gas -> United States Natural Gas Fund
+    "COAL": "KOL",       # Coal -> VanEck Coal ETF (Note: closed; alternatives below)
+    "LITHIUM": "LIT",    # Lithium -> Global X Lithium & Battery Tech ETF
+    "URANIUM": "URNM",   # Uranium -> Sprott Uranium Miners ETF
+    "COPPER": "CPER",    # Copper -> United States Copper Index Fund
+    "PLATINUM": "PPLT",  # Platinum -> Aberdeen Standard Physical Platinum Shares ETF
+    "PALLADIUM": "PALL"  # Palladium -> Aberdeen Standard Physical Palladium Shares ETF
+}
+
