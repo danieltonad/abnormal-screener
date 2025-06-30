@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from settings import settings
 from asyncio import sleep, create_task
 from enums.trade import TradeTimeFrame, TradeSide
+from hook import send_bulk_hook
 
 app = FastAPI()
 
@@ -12,9 +13,9 @@ async def crypto_ema_monitor(timeframe: TradeTimeFrame):
     while True:
         long = await double_ema_list(left=10, right=20, timeframe=timeframe, side=TradeSide.LONG)
         short = await double_ema_list(left=10, right=20, timeframe=timeframe, side=TradeSide.SHORT)
-        print(f"CRYPTO LONG EMA List: {long} \n\n")
-        print(f"CRYPTO SHORT EMA List: {short}")
-
+        await send_bulk_hook(tickers=long, hook_name="10/20 EMA", direction=TradeSide.SHORT, amount=50, profit=100, loss=35)
+        await send_bulk_hook(tickers=short, hook_name="10/20 EMA", direction=TradeSide.LONG, amount=50, profit=100, loss=35)
+        
         await sleep(timeframe.timeframe_sleep())  # Sleep for the specified timeframe duration
 
 
@@ -24,8 +25,9 @@ async def stocks_ema_monitor(timeframe: TradeTimeFrame):
     while True:
         long = await double_ema_list(left=10, right=20, timeframe=timeframe, side=TradeSide.LONG)
         short = await double_ema_list(left=10, right=20, timeframe=timeframe, side=TradeSide.SHORT)
-        print(f"STOCKS LONG EMA List: {long} \n\n")
-        print(f"STOCKS SHORT EMA List: {short}")
+
+        await send_bulk_hook(tickers=long, hook_name="10/20 EMA", direction=TradeSide.SHORT, amount=50, profit=100, loss=35)
+        await send_bulk_hook(tickers=short, hook_name="10/20 EMA", direction=TradeSide.LONG, amount=50, profit=100, loss=35)
 
         await sleep(timeframe.timeframe_sleep())  # Sleep for the specified timeframe duration
 
@@ -36,8 +38,8 @@ async def etf_ema_monitor(timeframe: TradeTimeFrame):
     while True:
         long = await double_ema_list(left=10, right=20, timeframe=timeframe, side=TradeSide.LONG)
         short = await double_ema_list(left=10, right=20, timeframe=timeframe, side=TradeSide.SHORT)
-        print(f"ETFS LONG EMA List: {long} \n\n")
-        print(f"ETFS SHORT EMA List: {short}")
+        await send_bulk_hook(tickers=long, hook_name="10/20 EMA", direction=TradeSide.SHORT, amount=50, profit=100, loss=35)
+        await send_bulk_hook(tickers=short, hook_name="10/20 EMA", direction=TradeSide.LONG, amount=50, profit=100, loss=35)
 
         await sleep(timeframe.timeframe_sleep())  # Sleep for the specified timeframe duration
 
@@ -45,7 +47,7 @@ async def etf_ema_monitor(timeframe: TradeTimeFrame):
 async def startup_event():
     create_task(crypto_ema_monitor(TradeTimeFrame.ONE_MIN))
     create_task(stocks_ema_monitor(TradeTimeFrame.ONE_MIN))
-    create_task(etf_ema_monitor(TradeTimeFrame.ONE_MIN))
+    # create_task(etf_ema_monitor(TradeTimeFrame.ONE_MIN))
 
 
 @app.on_event("shutdown")

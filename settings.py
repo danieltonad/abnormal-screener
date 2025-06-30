@@ -40,5 +40,28 @@ class Settings:
     
     def crypto_stable_symbol_list(self) -> set:
         return set([f"{coin}{self.CRYPTO_PAIR}" for coin in settings.CRYPTO_STABLE_COIN])
+    
+    def ticker_mask(self, ticker: str) -> str:
+        tickers = {
+            # Equity Index ETFs
+            "SPY": "US500",       # S&P 500
+            "QQQ": "US100",       # Nasdaq-100
+            "DIA": "US30",        # Dow Jones
+
+            # Commodity ETFs
+            "GLD": "GOLD",        # Gold
+            "SLV": "SILVER",      # Silver
+            "USO": "OIL",         # WTI Crude Oil
+            "BNO": "BRENT",       # Brent Crude Oil (United States Brent Oil Fund)
+            "UNG": "NATGAS",      # Natural Gas
+            "KOL": "COAL",        # Coal (VanEck Coal ETF — closed)
+            "PKOL": "COAL",       # KraneShares Global Coal ETF (alternative)
+            "LIT": "LITHIUM",     # Lithium
+            "URNM": "URANIUM",    # Uranium
+            "CPER": "COPPER",     # Copper
+            "PPLT": "PLATINUM",   # Platinum
+            "PALL": "PALLADIUM"   # Palladium
+        }
+        return tickers.get(ticker, ticker)  # Default to the ticker itself if not found
 
 settings = Settings()
