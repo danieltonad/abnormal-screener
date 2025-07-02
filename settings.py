@@ -80,7 +80,7 @@ class Settings:
             "CYB": "USDCNY",     # Chinese Yuan
             "FXM": "USDMXN",     # Mexican Peso
             "UUP": "DXY",        # US Dollar Index (bullish)
-            "UDN": "DXY_INV",  
+            "UDN": "DXY",  
         }
         return tickers.get(ticker, ticker)  # Default to the ticker itself if not found
     
