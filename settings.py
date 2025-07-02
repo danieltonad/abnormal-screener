@@ -6,6 +6,15 @@ load_dotenv(override=True)
 
 
 class Settings:
+
+    def __init__(self):
+        if not os.path.exists("watchlist.txt"):
+            self.watchlist = set()
+        with open("watchlist.txt", "r") as f:
+            self.watchlist = set(line.strip() for line in f if line.strip())
+
+        print(f"Watchlist loaded with {len(self.watchlist)} tickers.")
+
     CRYPTO_PAIR: str = "USD"
     CRYPTO_SCREENER_URL = "https://scanner.tradingview.com/crypto/scan?label-product=screener-crypto-cex"
     STOCKS_SCREENER_URL = "https://scanner.tradingview.com/america/scan?label-product=screener-stocks"
@@ -60,8 +69,21 @@ class Settings:
             "URNM": "URANIUM",    # Uranium
             "CPER": "COPPER",     # Copper
             "PPLT": "PLATINUM",   # Platinum
-            "PALL": "PALLADIUM"   # Palladium
+            "PALL": "PALLADIUM",   # Palladium
+
+            "FXE": "EURUSD",     # Euro
+            "FXY": "USDJPY",     # Japanese Yen
+            "FXB": "GBPUSD",     # British Pound
+            "FXC": "USDCAD",     # Canadian Dollar
+            "FXA": "AUDUSD",     # Australian Dollar
+            "FXF": "USDCHF",     # Swiss Franc
+            "CYB": "USDCNY",     # Chinese Yuan
+            "FXM": "USDMXN",     # Mexican Peso
+            "UUP": "DXY",        # US Dollar Index (bullish)
+            "UDN": "DXY_INV",  
         }
         return tickers.get(ticker, ticker)  # Default to the ticker itself if not found
+    
+        
 
 settings = Settings()
