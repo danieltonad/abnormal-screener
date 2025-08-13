@@ -30,3 +30,4 @@ async def send_bulk_hook(tickers: list, hook_name: str, direction: TradeSide, am
     async with AsyncClient() as session:
         for ticker in tickers:
             await send_hook(ticker, hook_name, direction, amount, profit, loss, session)
+            await asyncio.sleep(1)
