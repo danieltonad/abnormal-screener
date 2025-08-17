@@ -5,8 +5,10 @@ import json
 
 
 def double_ema_paylod(left: int, right: int, timeframe: TradeTimeFrame, operation: str = "crosses"):
-    return json.dumps({"filter":[{"left":f"EMA{left}{timeframe.timeframe_period()}","operation": operation, "right":f"EMA{right}{timeframe.timeframe_period()}"}],"ignore_unknown_fields":False,"options":{"lang":"en"},"range":[0,10000],"sort":{"sortBy":"aum","sortOrder":"desc"},"symbols":{},"markets":["america"],"filter2":{"operator":"and","operands":[{"operation":{"operator":"or","operands":[{"operation":{"operator":"and","operands":[{"expression":{"left":"typespecs","operation":"has","right":["etn"]}}]}},{"operation":{"operator":"and","operands":[{"expression":{"left":"typespecs","operation":"has","right":["etf"]}}]}},{"operation":{"operator":"and","operands":[{"expression":{"left":"type","operation":"equal","right":"structured"}}]}}]}}]}})
-    
+    change = 0.5 if operation == "crosses_above" else -0.5
+    change_ops = "greater" if operation == "crosses_above" else "less"
+    return json.dumps({"filter":[{"left":f"EMA{left}{timeframe.timeframe_period()}","operation": operation, "right":f"EMA{right}{timeframe.timeframe_period()}"},{"left": "change", "operation": change_ops, "right": change},{"left": "relative_volume_10d_calc", "operation": "greater", "right": 1.2},{"left": "market_cap_calc", "operation": "greater", "right": 10000000}],"ignore_unknown_fields":False,"options":{"lang":"en"},"range":[0,10000],"sort":{"sortBy":"aum","sortOrder":"desc"},"symbols":{},"markets":["america"],"filter2":{"operator":"and","operands":[{"operation":{"operator":"or","operands":[{"operation":{"operator":"and","operands":[{"expression":{"left":"typespecs","operation":"has","right":["etn"]}}]}},{"operation":{"operator":"and","operands":[{"expression":{"left":"typespecs","operation":"has","right":["etf"]}}]}},{"operation":{"operator":"and","operands":[{"expression":{"left":"type","operation":"equal","right":"structured"}}]}}]}}]}})
+
 async def double_ema_list(left: int, right: int, timeframe: TradeTimeFrame, side: TradeSide):
     operation = "crosses_above" if side == TradeSide.LONG else "crosses_below" if side == TradeSide.SHORT else ""
     return await __response_list(payload=double_ema_paylod(left, right, timeframe, operation))
