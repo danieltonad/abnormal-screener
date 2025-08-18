@@ -19,3 +19,30 @@ commodity_etf_equivalents = {
     "PALLADIUM": "PALL"  # Palladium -> Aberdeen Standard Physical Palladium Shares ETF
 }
 
+
+
+
+LONG
+{
+      "left": "EMA50",
+      "operation": "greater",
+      "right": "EMA200"
+},
+{
+    "left": "change_from_atr",
+    "operation": "greater",
+    "right": 0.5
+}
+
+
+SHORT
+{
+    "left": "EMA50",
+    "operation": "less",
+    "right": "EMA200"
+},
+{
+    "left": "change_from_atr",
+    "operation": "less",
+    "right": -0.5
+}
