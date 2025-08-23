@@ -12,10 +12,10 @@ async def crypto_ema_monitor(timeframe: TradeTimeFrame):
 
     while True:
         long = await double_ema_list(left=9, right=21, timeframe=timeframe, side=TradeSide.LONG)
-        await send_bulk_hook(tickers=long, hook_name="9/21 EMA", direction=TradeSide.LONG, amount=50, profit=25, loss=15)
+        await send_bulk_hook(tickers=long, hook_name="9/21 EMA", direction=TradeSide.LONG, amount=50, profit=20, loss=5)
 
         short = await double_ema_list(left=9, right=21, timeframe=timeframe, side=TradeSide.SHORT)
-        await send_bulk_hook(tickers=short, hook_name="9/21 EMA", direction=TradeSide.SHORT, amount=50, profit=25, loss=15)
+        await send_bulk_hook(tickers=short, hook_name="9/21 EMA", direction=TradeSide.SHORT, amount=50, profit=20, loss=5)
 
         await sleep(timeframe.timeframe_sleep() / 2)  # Sleep for the specified timeframe duration
 
@@ -25,10 +25,10 @@ async def stocks_ema_monitor(timeframe: TradeTimeFrame):
 
     while True:
         long = await double_ema_list(left=9, right=21, timeframe=timeframe, side=TradeSide.LONG)
-        await send_bulk_hook(tickers=long, hook_name="9/21 EMA", direction=TradeSide.LONG, amount=50, profit=30, loss=15)
+        await send_bulk_hook(tickers=long, hook_name="9/21 EMA", direction=TradeSide.LONG, amount=50, profit=25, loss=7)
 
         short = await double_ema_list(left=9, right=21, timeframe=timeframe, side=TradeSide.SHORT)
-        await send_bulk_hook(tickers=short, hook_name="9/21 EMA", direction=TradeSide.SHORT, amount=50, profit=30, loss=15)
+        await send_bulk_hook(tickers=short, hook_name="9/21 EMA", direction=TradeSide.SHORT, amount=50, profit=25, loss=7)
 
         await sleep(timeframe.timeframe_sleep() / 2)  # Sleep for the specified timeframe duration
 
@@ -38,10 +38,10 @@ async def etf_ema_monitor(timeframe: TradeTimeFrame):
 
     while True:
         long = await double_ema_list(left=9, right=21, timeframe=timeframe, side=TradeSide.LONG)
-        await send_bulk_hook(tickers=long, hook_name="9/21 EMA", direction=TradeSide.LONG, amount=50, profit=30, loss=15)
+        await send_bulk_hook(tickers=long, hook_name="9/21 EMA", direction=TradeSide.LONG, amount=50, profit=30, loss=11)
 
         short = await double_ema_list(left=9, right=21, timeframe=timeframe, side=TradeSide.SHORT)
-        await send_bulk_hook(tickers=short, hook_name="9/21 EMA", direction=TradeSide.SHORT, amount=50, profit=30, loss=15)
+        await send_bulk_hook(tickers=short, hook_name="9/21 EMA", direction=TradeSide.SHORT, amount=50, profit=30, loss=11)
 
         await sleep(timeframe.timeframe_sleep() / 2)  # Sleep for the specified timeframe duration
 

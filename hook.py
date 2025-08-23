@@ -19,7 +19,7 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
         "profit": profit,
         "loss": loss,
         "exit_criteria": [
-            "TP", "STRATEGY"
+            "TP", "STRATEGY", "SL"
         ]
     }
     res = await session.post(url, json=payload)
