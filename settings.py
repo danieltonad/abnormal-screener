@@ -10,10 +10,17 @@ class Settings:
     def __init__(self):
         if not os.path.exists("watchlist.txt"):
             self.watchlist = set()
+        
         with open("watchlist.txt", "r") as f:
             self.watchlist = set(line.strip() for line in f if line.strip())
+        
+        with open("capital.txt", "r") as f:
+            self.capital_list = set(line.strip() for line in f if line.strip())
 
         print(f"Watchlist loaded with {len(self.watchlist)} tickers.")
+        print(f"Capital list loaded with {len(self.capital_list)} tickers.")
+
+
 
     CRYPTO_PAIR: str = "USD"
     CRYPTO_SCREENER_URL = "https://scanner.tradingview.com/crypto/scan?label-product=screener-crypto-cex"
@@ -45,6 +52,11 @@ class Settings:
     )
 
     CRYPTO_STABLE_COIN: list = ["USDT", "USDC", "DAI", "DIA","BUSD", "TUSD", "GUSD", "PAX", "FRAX", "MIM", "USTC", "LUSD", "USDP", "USDD", "EURS", "SUSD", "ALUSD", "CUSD", "USDE", "PYUSD", "SHILL", "USDY"]
+
+
+    CAPITAL_IDENTITY: str = os.getenv("CAPITAL_IDENTITY")
+    CAPITAL_PASSWORD: str = os.getenv("CAPITAL_PASSWORD")
+    CAPITAL_API_KEY: str =  os.getenv("CAPITAL_API_KEY")
     
     
     def crypto_stable_symbol_list(self) -> set:
@@ -60,11 +72,11 @@ class Settings:
             # Commodity ETFs
             "GLD": "GOLD",        # Gold
             "SLV": "SILVER",      # Silver
-            "USO": "OIL",         # WTI Crude Oil
-            "BNO": "BRENT",       # Brent Crude Oil (United States Brent Oil Fund)
+            "USO": "OIL_CRUDE",         # WTI Crude Oil
+            "BNO": "OIL_BRENT",       # Brent Crude Oil (United States Brent Oil Fund)
             "UNG": "NATGAS",      # Natural Gas
-            "KOL": "COAL",        # Coal (VanEck Coal ETF — closed)
-            "PKOL": "COAL",       # KraneShares Global Coal ETF (alternative)
+            "KOL": "1898",        
+            "PKOL": "TECK",       
             "LIT": "LITHIUM",     # Lithium
             "URNM": "URANIUM",    # Uranium
             "CPER": "COPPER",     # Copper
@@ -79,8 +91,8 @@ class Settings:
             "FXF": "USDCHF",     # Swiss Franc
             "CYB": "USDCNY",     # Chinese Yuan
             "FXM": "USDMXN",     # Mexican Peso
-            "UUP": "DXY",        # US Dollar Index (bullish)
-            "UDN": "DXY",  
+            # "UUP": "DXY",        # US Dollar Index (bullish)
+            # "UDN": "DXY",  
         }
         return tickers.get(ticker, ticker)  # Default to the ticker itself if not found
     

@@ -3,7 +3,7 @@ from enums.trade import TradeSide
 import asyncio
 
 
-async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, session: AsyncClient):
+async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, session: AsyncClient, mkt_closed: bool = False):
     from settings import settings
     ticker = settings.ticker_mask(ticker)
     if ticker not in settings.watchlist:
@@ -22,12 +22,14 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
             "TP", "STRATEGY", "SL"
         ]
     }
+    if mkt_closed:
+        payload["exit_criteria"].append("MKT_CLOSED")
     res = await session.post(url, json=payload)
-    print(f"Hook sent for {ticker}: {res.status_code} - {res.text} -> {direction}")
+    print(f"Hook sent for {ticker}: {res.status_code} -> {direction}")
 
 
-async def send_bulk_hook(tickers: list, hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int):
+async def send_bulk_hook(tickers: list, hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, mkt_closed: bool = False):
     async with AsyncClient() as session:
         for ticker in tickers:
-            await send_hook(ticker, hook_name, direction, amount, profit, loss, session)
+            await send_hook(ticker, hook_name, direction, amount, profit, loss, session, mkt_closed)
             await asyncio.sleep(1)
