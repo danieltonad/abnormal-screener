@@ -21,4 +21,5 @@ class JobManager:
         for epic in settings.capital_list:
             await asyncio.sleep(1)
             await capital_socket.subscribe_to_epic(epic, timeframe="MINUTE")
+            await capital_socket.subscribe_to_epic(epic, timeframe="MINUTE_15")
         scheduler.start()

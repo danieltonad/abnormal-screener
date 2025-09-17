@@ -62,7 +62,7 @@ class Memory:
             X_SECURITY_TOKEN = header.get("X-SECURITY-TOKEN")
             # print(CST, X_SECURITY_TOKEN)
             self.capital_auth_header = {'X-SECURITY-TOKEN': X_SECURITY_TOKEN, 'CST': CST}
-            print("Capital.com Auth Header Updated")
+            # print("Capital.com Auth Header Updated")
             
         except Exception as e:
             await Logger.app_log(title="UPDATE_AUTH_HEADER_ERR", message=str(e))

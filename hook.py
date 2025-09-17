@@ -25,7 +25,7 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
     if mkt_closed:
         payload["exit_criteria"].append("MKT_CLOSED")
     res = await session.post(url, json=payload)
-    print(f"Hook sent for {ticker}: {res.status_code} -> {direction}")
+    print(f"{hook_name} Hook | {ticker}: {res.status_code} -> {direction}")
 
 
 async def send_bulk_hook(tickers: list, hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, mkt_closed: bool = False):

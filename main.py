@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from capital_com import memory
+from capital_com.signals import signal_ema_crossover
 from settings import settings
 from asyncio import sleep, create_task
 from enums.trade import TradeTimeFrame, TradeSide
@@ -41,10 +43,10 @@ async def stocks_ema_monitor(timeframe: TradeTimeFrame):
         if stocks_operation_time():
 
             long = await double_ema_list(left=9, right=21, timeframe=timeframe, side=TradeSide.LONG)
-            await send_bulk_hook(tickers=long, hook_name="9/21 EMA", direction=TradeSide.LONG, amount=50, profit=32, loss=7, mkt_closed=True)
+            await send_bulk_hook(tickers=long, hook_name="9/21 EMA", direction=TradeSide.LONG, amount=50, profit=50, loss=50, mkt_closed=True)
 
             short = await double_ema_list(left=9, right=21, timeframe=timeframe, side=TradeSide.SHORT)
-            await send_bulk_hook(tickers=short, hook_name="9/21 EMA", direction=TradeSide.SHORT, amount=50, profit=32, loss=7, mkt_closed=True)
+            await send_bulk_hook(tickers=short, hook_name="9/21 EMA", direction=TradeSide.SHORT, amount=50, profit=50, loss=50, mkt_closed=True)
 
         await sleep(timeframe.timeframe_sleep() / 2)  # Sleep for the specified timeframe duration
 
@@ -66,33 +68,37 @@ async def etf_ema_monitor(timeframe: TradeTimeFrame):
 
 async def capital_com_signal():
     from capital_com.signals import signal_ema_crossover, signal_rejection, signal_breakout
-    from capital_com.smc import signal_smc
+    from capital_com.smc import signal_smc, memory
+    from leverage import get_leverage
+    amount = 50
     
-    for ticker in settings.capital_list:
-        side_ema = signal_ema_crossover(ticker, fast=9, slow=21)
-        side_rej = signal_rejection(ticker)
-        side_bk = signal_breakout(ticker)
-        side_smc = signal_smc(ticker)
+    while True: 
+        for ticker in settings.capital_list:
+            capital = get_leverage(ticker) * amount
+            side_ema = signal_ema_crossover(ticker, timeframe="MINUTE")
+            side_rej = signal_rejection(ticker, timeframe="MINUTE")
+            side_bk = signal_breakout(ticker, timeframe="MINUTE")
+            side_smc = signal_smc(ticker, timeframe="MINUTE_15")
 
-        # Prioritize EMA crossover signals
-        if side_ema != TradeSide.NEUTRAL:
-            print("Capital.com Signal:", ticker, "EMA Crossover:", side_ema.name)
-            await send_bulk_hook(tickers=[ticker], hook_name="9/21 EMA", direction=side_ema, amount=50, profit=25, loss=7)
+            # EMA crossover signals
+            if side_ema != TradeSide.NEUTRAL:
+                await send_bulk_hook(tickers=[ticker], hook_name="5/13 EMA", direction=side_ema, amount=amount, profit=50, loss=50, mkt_closed=True)
 
-        if side_rej != TradeSide.NEUTRAL:
-            print("Capital.com Signal:", ticker, "SR REJECTION:", side_rej.name)
-            await send_bulk_hook(tickers=[ticker], hook_name="SR REJECTION", direction=side_rej, amount=50, profit=25, loss=7)
+            # Rejection and Breakout signals
+            if side_rej != TradeSide.NEUTRAL:
+                await send_bulk_hook(tickers=[ticker], hook_name="SR REJCT", direction=side_rej, amount=amount, profit=50, loss=50, mkt_closed=True)
 
-        if side_bk != TradeSide.NEUTRAL:
-            print("Capital.com Signal:", ticker, "BRK OUT:", side_bk.name)
-            await send_bulk_hook(tickers=[ticker], hook_name="BRK OUT", direction=side_bk, amount=50, profit=25, loss=7)
+            if side_bk != TradeSide.NEUTRAL:
+                await send_bulk_hook(tickers=[ticker], hook_name="BRK OUT", direction=side_bk, amount=amount, profit=50, loss=50, mkt_closed=True)
 
-        if side_smc != TradeSide.NEUTRAL:
-            print("Capital.com Signal:", ticker, "SMC:", side_smc.name)
-            await send_bulk_hook(tickers=[ticker], hook_name="SMC", direction=side_smc, amount=50, profit=25, loss=7)
+            if side_smc != TradeSide.NEUTRAL:
+                await send_bulk_hook(tickers=[ticker], hook_name="SMC", direction=side_smc, amount=amount, profit=50, loss=50, mkt_closed=True)
 
-    await sleep(10)  # Run every minute
-
+        await sleep(55)
+        # msg = ""
+        # for key, bars in memory.ohlc_history.items():
+        #     msg += f"{key[0]} ({key[1]}): {len(bars)} bars\n"
+        # print("OHLC Data Summary:\n", msg)
 
 @app.on_event("startup")
 async def startup_event():
@@ -100,9 +106,9 @@ async def startup_event():
     
     await JobManager.start()
     # print(settings.watchlist)
-    create_task(crypto_ema_monitor(TradeTimeFrame.ONE_MIN))
+    # create_task(crypto_ema_monitor(TradeTimeFrame.ONE_MIN))
     create_task(stocks_ema_monitor(TradeTimeFrame.ONE_MIN))
-    create_task(etf_ema_monitor(TradeTimeFrame.ONE_MIN))
+    # create_task(etf_ema_monitor(TradeTimeFrame.ONE_MIN))
     create_task(capital_com_signal())
 
 

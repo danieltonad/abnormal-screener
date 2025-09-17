@@ -1,4 +1,15 @@
 import numpy as np
+from collections import defaultdict
+from datetime import datetime
+
+last_signal_time = defaultdict(lambda: None)  # cooldown memory
+
+
+
+def sma(values, period):
+    if len(values) < period:
+        return None
+    return sum(values[-period:]) / period
 
 def ema(values, period):
     """Exponential Moving Average"""
@@ -15,4 +26,15 @@ def atr(bars, period=14):
         prev_close = bars[i-1]["c"]
         tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
         trs.append(tr)
-    return np.mean(trs[-period:]) if len(trs) >= period else None
+    return np.mean(trs[-period:]) if len(trs) >= period else []
+
+
+def check_cooldown(ticker, now, cooldown=5):
+    """Prevent multiple trades within cooldown minutes."""
+    global last_signal_time
+    if last_signal_time[ticker] is not None:
+        delta = (now - last_signal_time[ticker]).total_seconds() / 60
+        if delta < cooldown:
+            return False
+    last_signal_time[ticker] = now
+    return True
