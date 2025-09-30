@@ -13,7 +13,7 @@ class Memory:
     ohlc_latest: Dict[Tuple[str, str], dict] = {}
 
     # Rolling store: (epic, resolution) -> deque of bars
-    ohlc_history: Dict[Tuple[str, str], Deque[dict]] = defaultdict(lambda: deque(maxlen=500))
+    ohlc_history: Dict[Tuple[str, str], Deque[dict]] = defaultdict(lambda: deque(maxlen=3_000))
 
     def update_ohlc_data(self, epic: str, resolution: str, timestamp: str, open: float, high: float, low: float, close: float, price_type: str):
         """Update OHLC data (latest + history) for an epic/resolution."""
@@ -43,6 +43,7 @@ class Memory:
         """Get last n bars for an epic/resolution."""
         return list(self.ohlc_history[(epic, resolution)][-n:])
 
+    
     async def update_auth_header(self) -> None:
         try:
             payload = json.dumps({
@@ -68,6 +69,47 @@ class Memory:
             await Logger.app_log(title="UPDATE_AUTH_HEADER_ERR", message=str(e))
             await asyncio.sleep(100)
             return await self.update_auth_header()
+
+
+
+
+    async def preload_history(self, epic: str, resolution: str = "DAY", n: int = 100):
+        """
+        Fetch last n OHLC bars from Capital.com REST API and store in history.
+        """
+        try:
+            headers = {
+                "X-CAP-API-KEY": settings.CAPITAL_API_KEY,
+                "CST": self.capital_auth_header.get("CST", ""),
+                "X-SECURITY-TOKEN": self.capital_auth_header.get("X-SECURITY-TOKEN", "")
+            }
+
+            url = f"https://api-capital.backend-capital.com/api/v1/prices/{epic}?resolution={resolution}&max={n}&pageNumber=1"
+
+            async with AsyncClient() as session:
+                resp = await session.get(url, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+
+            prices = data.get("prices", [])
+            key = (epic, resolution)
+
+            for p in prices:
+                bar = {
+                    "t": p["snapshotTimeUTC"],    # or "snapshotTime"
+                    "o": p["openPrice"]["bid"],
+                    "h": p["highPrice"]["bid"],
+                    "l": p["lowPrice"]["bid"],
+                    "c": p["closePrice"]["bid"],
+                    "price_type": "bid"
+                }
+                self.ohlc_history[key].append(bar)
+
+            return list(self.ohlc_history[key])
+
+        except Exception as e:
+            await Logger.app_log(title="PRELOAD_HISTORY_ERR", message=f"{epic}: {str(e)}")
+            return []
 
 
     

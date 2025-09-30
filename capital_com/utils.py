@@ -38,3 +38,41 @@ def check_cooldown(ticker, now, cooldown=5):
             return False
     last_signal_time[ticker] = now
     return True
+
+
+import numpy as np
+
+def rsi(closes, period=14):
+    if len(closes) < period + 1:
+        return None
+
+    deltas = np.diff(closes)
+    gains = np.where(deltas > 0, deltas, 0.0)
+    losses = np.where(deltas < 0, -deltas, 0.0)
+
+    avg_gain = np.mean(gains[:period])
+    avg_loss = np.mean(losses[:period])
+
+    rsi_values = []
+
+    if avg_loss == 0:
+        rsi_values.append(100.0)
+    else:
+        rs = avg_gain / avg_loss
+        rsi_values.append(100.0 - (100.0 / (1.0 + rs)))
+
+    # Wilder’s smoothing
+    for i in range(period, len(deltas)):
+        gain = gains[i]
+        loss = losses[i]
+
+        avg_gain = (avg_gain * (period - 1) + gain) / period
+        avg_loss = (avg_loss * (period - 1) + loss) / period
+
+        if avg_loss == 0:
+            rsi_values.append(100.0)
+        else:
+            rs = avg_gain / avg_loss
+            rsi_values.append(100.0 - (100.0 / (1.0 + rs)))
+
+    return rsi_values if len(rsi_values) > 1 else rsi_values[0]

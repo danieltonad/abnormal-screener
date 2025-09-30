@@ -97,7 +97,7 @@ def signal_smc(
     min_bars=200,
     atr_period=14,
     consolidation_lookback=20,
-    confirmation_required=0,
+    confirmation_required=2,
 ):
     """
     Returns LONG / SHORT / NEUTRAL based on SMC logic.
@@ -144,7 +144,7 @@ def signal_smc(
         lower_wick = min(last["c"], last["o"]) - last["l"]
         if impulse_ok and lower_wick > 0.5 * abs(last["c"] - last["o"]):
             confirmations += 1
-        if confirmations:
+        if confirmations > confirmation_required:
             return TradeSide.LONG
 
     # --- Short logic ---

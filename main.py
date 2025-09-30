@@ -67,34 +67,61 @@ async def etf_ema_monitor(timeframe: TradeTimeFrame):
 
 
 async def capital_com_signal():
-    from capital_com.signals import signal_ema_crossover, signal_rejection, signal_breakout
-    from capital_com.smc import signal_smc, memory
+    from capital_com.signal2 import signal_hybrid, signal_atr_breakout, signal_mean_reversion, signal_momentum, signal_trend_following, get_levels
+    from capital_com.smc import signal_smc
     from leverage import get_leverage
     amount = 50
     
     while True: 
         for ticker in settings.capital_list:
-            capital = get_leverage(ticker) * amount
-            side_ema = signal_ema_crossover(ticker, timeframe="MINUTE")
-            side_rej = signal_rejection(ticker, timeframe="MINUTE")
-            side_bk = signal_breakout(ticker, timeframe="MINUTE")
-            side_smc = signal_smc(ticker, timeframe="MINUTE_15")
+            side_smc = signal_smc(ticker, timeframe="DAY")
+            side_hybrid = signal_hybrid(ticker, timeframe="DAY")
+            side_atr_breakout = signal_atr_breakout(ticker, timeframe="DAY")
+            side_mean_reversion = signal_mean_reversion(ticker, timeframe="DAY")
+            side_momentum = signal_momentum(ticker, timeframe="DAY")
+            side_trend_following = signal_trend_following(ticker, timeframe="DAY")
+            
+            # calculate profit and loss levels
+            profit_long, loss_long = get_levels(ticker, TradeSide.LONG, timeframe="DAY", rr=2, notional=amount * get_leverage(ticker))
+            profit_short, loss_short = get_levels(ticker, TradeSide.SHORT, timeframe="DAY", rr=2, notional=amount * get_leverage(ticker))
 
-            # EMA crossover signals
-            if side_ema != TradeSide.NEUTRAL:
-                await send_bulk_hook(tickers=[ticker], hook_name="5/13 EMA", direction=side_ema, amount=amount, profit=50, loss=50, mkt_closed=True)
-
-            # Rejection and Breakout signals
-            if side_rej != TradeSide.NEUTRAL:
-                await send_bulk_hook(tickers=[ticker], hook_name="SR REJCT", direction=side_rej, amount=amount, profit=50, loss=50, mkt_closed=True)
-
-            if side_bk != TradeSide.NEUTRAL:
-                await send_bulk_hook(tickers=[ticker], hook_name="BRK OUT", direction=side_bk, amount=amount, profit=50, loss=50, mkt_closed=True)
-
+            # SMC
             if side_smc != TradeSide.NEUTRAL:
-                await send_bulk_hook(tickers=[ticker], hook_name="SMC", direction=side_smc, amount=amount, profit=50, loss=50, mkt_closed=True)
+                profit = profit_long if side_smc == TradeSide.LONG else profit_short
+                loss = loss_long if side_smc == TradeSide.LONG else loss_short
+                await send_bulk_hook(tickers=[ticker], hook_name="SMC", direction=side_smc, amount=amount, profit=profit, loss=loss, mkt_closed=True)
 
-        await sleep(55)
+            # Hybrid signals
+            # if side_hybrid != TradeSide.NEUTRAL:
+            #     profit = profit_long if side_hybrid == TradeSide.LONG else profit_short
+            #     loss = loss_long if side_hybrid == TradeSide.LONG else loss_short
+            #     await send_bulk_hook(tickers=[ticker], hook_name="HYBRID", direction=side_hybrid, amount=amount, profit=profit, loss=loss, mkt_closed=True)
+
+            # ATR Breakout signals
+            if side_atr_breakout != TradeSide.NEUTRAL:
+                profit = profit_long if side_atr_breakout == TradeSide.LONG else profit_short
+                loss = loss_long if side_atr_breakout == TradeSide.LONG else loss_short
+                await send_bulk_hook(tickers=[ticker], hook_name="ATR BRK OUT", direction=side_atr_breakout, amount=amount, profit=profit, loss=loss, mkt_closed=True)
+
+            # Mean Reversion signals
+            if side_mean_reversion != TradeSide.NEUTRAL:
+                profit = profit_long if side_mean_reversion == TradeSide.LONG else profit_short
+                loss = loss_long if side_mean_reversion == TradeSide.LONG else loss_short
+                await send_bulk_hook(tickers=[ticker], hook_name="MEAN REV", direction=side_mean_reversion, amount=amount, profit=profit, loss=loss, mkt_closed=True)
+
+            # Momentum signals
+            # if side_momentum != TradeSide.NEUTRAL:
+            #     profit = profit_long if side_momentum == TradeSide.LONG else profit_short
+            #     loss = loss_long if side_momentum == TradeSide.LONG else loss_short
+            #     await send_bulk_hook(tickers=[ticker], hook_name="MOMENTUM", direction=side_momentum, amount=amount, profit=profit, loss=loss, mkt_closed=True)
+
+            # Trend Following signals
+            if side_trend_following != TradeSide.NEUTRAL:
+                profit = profit_long if side_trend_following == TradeSide.LONG else profit_short
+                loss = loss_long if side_trend_following == TradeSide.LONG else loss_short
+                await send_bulk_hook(tickers=[ticker], hook_name="TREND", direction=side_trend_following, amount=amount, profit=profit, loss=loss, mkt_closed=True)
+
+        await sleep(35)
         # msg = ""
         # for key, bars in memory.ohlc_history.items():
         #     msg += f"{key[0]} ({key[1]}): {len(bars)} bars\n"
@@ -107,7 +134,7 @@ async def startup_event():
     await JobManager.start()
     # print(settings.watchlist)
     # create_task(crypto_ema_monitor(TradeTimeFrame.ONE_MIN))
-    create_task(stocks_ema_monitor(TradeTimeFrame.ONE_MIN))
+    # create_task(stocks_ema_monitor(TradeTimeFrame.ONE_MIN))
     # create_task(etf_ema_monitor(TradeTimeFrame.ONE_MIN))
     create_task(capital_com_signal())
 

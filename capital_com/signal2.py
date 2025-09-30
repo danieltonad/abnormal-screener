@@ -1,0 +1,224 @@
+from .utils import atr, rsi, sma
+from enums.trade import TradeSide
+from .memory import memory
+import numpy as np
+from datetime import datetime
+
+
+# Trend-Following (Donchian / Turtle style)
+def signal_trend_following(
+    ticker: str,
+    timeframe="DAY",
+    breakout_period=20,
+    exit_period=10,
+):
+    bars = [b for b in memory.ohlc_history.get((ticker, timeframe), []) if b["price_type"] == "bid"]
+
+    if len(bars) < breakout_period + exit_period:
+        return TradeSide.NEUTRAL
+
+    closes = [b["c"] for b in bars]
+    highs = [b["h"] for b in bars]
+    lows = [b["l"] for b in bars]
+
+    last = bars[-1]
+
+    high_range = max(highs[-breakout_period:])
+    low_range = min(lows[-breakout_period:])
+    exit_high = max(highs[-exit_period:])
+    exit_low = min(lows[-exit_period:])
+
+    # --- Breakout Up ---
+    if last["c"] > high_range:
+        return TradeSide.LONG
+
+    # --- Breakout Down ---
+    if last["c"] < low_range:
+        return TradeSide.SHORT
+
+    # --- Exit Conditions ---
+    if last["c"] < exit_low:
+        return TradeSide.SHORT
+    if last["c"] > exit_high:
+        return TradeSide.LONG
+
+    return TradeSide.NEUTRAL
+
+
+
+# Momentum Rotation (single-ticker version)
+def signal_momentum(
+    ticker: str,
+    timeframe="DAY",
+    lookback=60,
+):
+    bars = [b for b in memory.ohlc_history.get((ticker, timeframe), []) if b["price_type"] == "bid"]
+
+    if len(bars) < lookback + 1:
+        return TradeSide.NEUTRAL
+
+    closes = [b["c"] for b in bars]
+
+    momentum = closes[-1] / closes[-lookback] - 1
+
+    if momentum > 0:
+        return TradeSide.LONG
+    elif momentum < 0:
+        return TradeSide.SHORT
+    else:
+        return TradeSide.NEUTRAL
+    
+
+
+
+
+
+
+
+
+
+
+
+# Mean Reversion (RSI(2))
+def signal_mean_reversion(
+    ticker: str,
+    timeframe="DAY",
+    rsi_period=2,
+    oversold=10,
+    overbought=90,
+):
+    bars = [b for b in memory.ohlc_history.get((ticker, timeframe), []) if b["price_type"] == "bid"]
+
+    if len(bars) < rsi_period + 1:
+        return TradeSide.NEUTRAL
+
+    closes = [b["c"] for b in bars]
+    rsi_val = rsi(closes, rsi_period)
+    if isinstance(rsi_val, list):
+        rsi_val = rsi_val[-1]
+
+    if rsi_val is None:
+        return TradeSide.NEUTRAL
+
+    last = bars[-1]
+
+    if rsi_val < oversold:
+        return TradeSide.LONG
+    elif rsi_val > overbought:
+        return TradeSide.SHORT
+    else:
+        return TradeSide.NEUTRAL
+
+
+
+# Breakout + ATR Buffer
+def signal_atr_breakout(
+    ticker: str,
+    timeframe="DAY",
+    atr_period=20,
+    atr_mult=1.0,
+):
+    bars = [b for b in memory.ohlc_history.get((ticker, timeframe), []) if b["price_type"] == "bid"]
+
+    if len(bars) < atr_period + 2:
+        return TradeSide.NEUTRAL
+
+    last = bars[-1]
+    prev = bars[-2]
+
+    vol = atr(bars, atr_period)
+    if isinstance(vol, list):
+        vol = vol[-1]
+    buffer = atr_mult * vol if vol else 0
+
+    if last["c"] > prev["h"] + buffer:
+        return TradeSide.LONG
+    elif last["c"] < prev["l"] - buffer:
+        return TradeSide.SHORT
+
+    return TradeSide.NEUTRAL
+
+
+
+
+
+# Hybrid (Trend + Mean Reversion)
+def signal_hybrid(
+    ticker: str,
+    timeframe="DAY",
+    sma_period=100,
+    rsi_period=2,
+    oversold=10,
+    overbought=90,
+):
+    bars = [b for b in memory.ohlc_history.get((ticker, timeframe), []) if b["price_type"] == "bid"]
+
+    if len(bars) < max(sma_period, rsi_period + 1):
+        return TradeSide.NEUTRAL
+
+    closes = [b["c"] for b in bars]
+    sma_val = sma(closes, sma_period)
+    if isinstance(sma_val, list):
+        sma_val = sma_val[-1]
+
+    rsi_val = rsi(closes, rsi_period)
+    if isinstance(rsi_val, list):
+        rsi_val = rsi_val[-1]
+
+    last = bars[-1]
+
+    # Uptrend → only long oversold
+    if last["c"] > sma_val and rsi_val < oversold:
+        return TradeSide.LONG
+
+    # Downtrend → only short overbought
+    if last["c"] < sma_val and rsi_val > overbought:
+        return TradeSide.SHORT
+
+    return TradeSide.NEUTRAL
+
+
+
+
+
+
+
+
+
+
+def get_levels(
+    ticker: str,
+    side,
+    timeframe="DAY",
+    atr_period=14,
+    atr_mult=1.0,     # for SL
+    rr=1.0,           # reward multiplier
+    notional=1000.0
+):
+    """
+    Returns (SL$, TP$) tuple at chosen RR.
+    """
+    bars = [b for b in memory.ohlc_history.get((ticker, timeframe), []) if b["price_type"] == "bid"]
+    if len(bars) < atr_period + 1:
+        return 50, 50 # default
+
+    entry = bars[-1]["c"]
+
+    vol = atr(bars, atr_period)
+    if isinstance(vol, list):
+        vol = vol[-1]
+    if vol is None:
+        return 50, 50 # default
+
+    # price distances
+    sl_dist = atr_mult * vol
+    tp_dist = sl_dist * rr
+
+    # convert to dollar PnL
+    sl_pnl = notional * (sl_dist / entry)
+    tp_pnl = notional * (tp_dist / entry)
+
+    return (int(sl_pnl), int(tp_pnl))
+
+
+
