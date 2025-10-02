@@ -218,7 +218,7 @@ def get_levels(
     sl_pnl = notional * (sl_dist / entry)
     tp_pnl = notional * (tp_dist / entry)
 
-    return (int(sl_pnl), int(tp_pnl))
+    return (int(tp_pnl), int(sl_pnl))
 
 
 

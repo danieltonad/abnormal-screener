@@ -92,10 +92,10 @@ async def capital_com_signal():
                 await send_bulk_hook(tickers=[ticker], hook_name="SMC", direction=side_smc, amount=amount, profit=profit, loss=loss, mkt_closed=True)
 
             # Hybrid signals
-            # if side_hybrid != TradeSide.NEUTRAL:
-            #     profit = profit_long if side_hybrid == TradeSide.LONG else profit_short
-            #     loss = loss_long if side_hybrid == TradeSide.LONG else loss_short
-            #     await send_bulk_hook(tickers=[ticker], hook_name="HYBRID", direction=side_hybrid, amount=amount, profit=profit, loss=loss, mkt_closed=True)
+            if side_hybrid != TradeSide.NEUTRAL:
+                profit = profit_long if side_hybrid == TradeSide.LONG else profit_short
+                loss = loss_long if side_hybrid == TradeSide.LONG else loss_short
+                await send_bulk_hook(tickers=[ticker], hook_name="HYBRID", direction=side_hybrid, amount=amount, profit=profit, loss=loss, mkt_closed=True)
 
             # ATR Breakout signals
             if side_atr_breakout != TradeSide.NEUTRAL:
