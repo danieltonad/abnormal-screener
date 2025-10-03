@@ -23,7 +23,7 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
         ]
     }
     if mkt_closed:
-        payload["exit_criteria"].append("MKT_CLOSED")
+        payload["exit_criteria"].append("EOW_CLOSE")
     res = await session.post(url, json=payload)
     print(f"{hook_name} Hook | {ticker}: {res.status_code} -> {direction} | TP: ${profit} | SL: ${loss}")
 

@@ -182,6 +182,109 @@ def signal_hybrid(
 
 
 
+# Candlestick Pattern Based Signal
+def signal_candle_patterns(
+    ticker: str,
+    timeframe="DAY",
+    sma_period=20
+):
+    bars = [
+        b for b in memory.ohlc_history.get((ticker, timeframe), [])
+        if b["price_type"] == "bid"
+    ]
+
+    if len(bars) < sma_period + 3:
+        return TradeSide.NEUTRAL
+
+    closes = [b["c"] for b in bars]
+    opens  = [b["o"] for b in bars]
+    highs  = [b["h"] for b in bars]
+    lows   = [b["l"] for b in bars]
+
+    ma = sma(closes, sma_period)
+    ma = ma[-1] if isinstance(ma, list) else ma
+
+    last   = bars[-1]
+    prev1  = bars[-2]
+    prev2  = bars[-3]
+
+    body     = abs(last["c"] - last["o"])
+    avg_body = sum(abs(c - o) for c, o in zip(closes[-sma_period:], opens[-sma_period:])) / sma_period
+
+    is_bull = last["c"] > last["o"]
+    is_bear = last["c"] < last["o"]
+
+    # === Bullish Patterns ===
+    bull_engulf = (
+        is_bull
+        and last["c"] > prev1["o"]
+        and last["o"] < prev1["c"]
+        and last["c"] > prev1["c"]
+        and last["o"] <= prev1["o"]
+        and body > avg_body
+        and last["c"] < ma
+    )
+
+    hammer = (
+        is_bull
+        and (last["h"] - last["l"]) > 3.0 * body
+        and (last["c"] - last["l"]) / (0.001 + last["h"] - last["l"]) > 0.6
+        and body > avg_body
+        and last["c"] < ma
+    )
+
+    morning_star = (
+        prev2["c"] < prev2["o"]
+        and abs(prev1["c"] - prev1["o"]) < avg_body
+        and is_bull
+        and last["c"] > (prev2["o"] + prev2["c"]) / 2
+        and last["c"] < ma
+    )
+
+    bullish = bull_engulf or hammer or morning_star
+
+    # === Bearish Patterns ===
+    bear_engulf = (
+        is_bear
+        and last["c"] < prev1["o"]
+        and last["o"] > prev1["c"]
+        and last["c"] < prev1["c"]
+        and last["o"] >= prev1["o"]
+        and body > avg_body
+        and last["c"] > ma
+    )
+
+    shooting_star = (
+        is_bear
+        and (last["h"] - last["l"]) > 3.0 * body
+        and (last["h"] - last["c"]) / (0.001 + last["h"] - last["l"]) > 0.6
+        and body > avg_body
+        and last["c"] > ma
+    )
+
+    evening_star = (
+        prev2["c"] > prev2["o"]
+        and abs(prev1["c"] - prev1["o"]) < avg_body
+        and is_bear
+        and last["c"] < (prev2["o"] + prev2["c"]) / 2
+        and last["c"] > ma
+    )
+
+    bearish = bear_engulf or shooting_star or evening_star
+
+    # === Return trade side ===
+    if bullish:
+        return TradeSide.LONG
+    elif bearish:
+        return TradeSide.SHORT
+    else:
+        return TradeSide.NEUTRAL
+
+
+
+
+
+
 
 
 

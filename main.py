@@ -67,7 +67,7 @@ async def etf_ema_monitor(timeframe: TradeTimeFrame):
 
 
 async def capital_com_signal():
-    from capital_com.signal2 import signal_hybrid, signal_atr_breakout, signal_mean_reversion, signal_momentum, signal_trend_following, get_levels
+    from capital_com.signal2 import signal_hybrid, signal_atr_breakout, signal_mean_reversion, signal_momentum, signal_trend_following, get_levels, signal_candle_patterns
     from capital_com.smc import signal_smc
     from leverage import get_leverage
     amount = 50
@@ -80,7 +80,8 @@ async def capital_com_signal():
             side_mean_reversion = signal_mean_reversion(ticker, timeframe="DAY")
             side_momentum = signal_momentum(ticker, timeframe="DAY")
             side_trend_following = signal_trend_following(ticker, timeframe="DAY")
-            
+            side_candle_patterns = signal_candle_patterns(ticker, timeframe="DAY")
+
             # calculate profit and loss levels
             profit_long, loss_long = get_levels(ticker, TradeSide.LONG, timeframe="DAY", rr=2, notional=amount * get_leverage(ticker))
             profit_short, loss_short = get_levels(ticker, TradeSide.SHORT, timeframe="DAY", rr=2, notional=amount * get_leverage(ticker))
@@ -109,6 +110,13 @@ async def capital_com_signal():
                 loss = loss_long if side_mean_reversion == TradeSide.LONG else loss_short
                 await send_bulk_hook(tickers=[ticker], hook_name="MEAN REV", direction=side_mean_reversion, amount=amount, profit=profit, loss=loss, mkt_closed=True)
 
+
+            # candle pattern signals
+            if side_candle_patterns != TradeSide.NEUTRAL:
+                profit = profit_long if side_candle_patterns == TradeSide.LONG else profit_short
+                loss = loss_long if side_candle_patterns == TradeSide.LONG else loss_short
+                await send_bulk_hook(tickers=[ticker], hook_name="CANDLE", direction=side_candle_patterns, amount=amount, profit=profit, loss=loss, mkt_closed=True)
+
             # Momentum signals
             # if side_momentum != TradeSide.NEUTRAL:
             #     profit = profit_long if side_momentum == TradeSide.LONG else profit_short
@@ -116,10 +124,10 @@ async def capital_com_signal():
             #     await send_bulk_hook(tickers=[ticker], hook_name="MOMENTUM", direction=side_momentum, amount=amount, profit=profit, loss=loss, mkt_closed=True)
 
             # Trend Following signals
-            if side_trend_following != TradeSide.NEUTRAL:
-                profit = profit_long if side_trend_following == TradeSide.LONG else profit_short
-                loss = loss_long if side_trend_following == TradeSide.LONG else loss_short
-                await send_bulk_hook(tickers=[ticker], hook_name="TREND", direction=side_trend_following, amount=amount, profit=profit, loss=loss, mkt_closed=True)
+            # if side_trend_following != TradeSide.NEUTRAL:
+            #     profit = profit_long if side_trend_following == TradeSide.LONG else profit_short
+            #     loss = loss_long if side_trend_following == TradeSide.LONG else loss_short
+            #     await send_bulk_hook(tickers=[ticker], hook_name="TREND", direction=side_trend_following, amount=amount, profit=profit, loss=loss, mkt_closed=True)
 
         await sleep(35)
         # msg = ""
