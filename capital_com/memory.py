@@ -13,7 +13,7 @@ class Memory:
     ohlc_latest: Dict[Tuple[str, str], dict] = {}
 
     # Rolling store: (epic, resolution) -> deque of bars
-    ohlc_history: Dict[Tuple[str, str], Deque[dict]] = defaultdict(lambda: deque(maxlen=3_000))
+    ohlc_history: Dict[Tuple[str, str], Deque[dict]] = defaultdict(lambda: deque(maxlen=500))
 
     def update_ohlc_data(self, epic: str, resolution: str, timestamp: str, open: float, high: float, low: float, close: float, price_type: str):
         """Update OHLC data (latest + history) for an epic/resolution."""

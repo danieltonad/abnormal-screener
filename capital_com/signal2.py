@@ -294,8 +294,8 @@ def get_levels(
     side,
     timeframe="DAY",
     atr_period=14,
-    atr_mult=1.0,     # for SL
-    rr=1.0,           # reward multiplier
+    atr_mult=2.0,     # for SL
+    rr=3.0,           # reward multiplier
     notional=1000.0
 ):
     """

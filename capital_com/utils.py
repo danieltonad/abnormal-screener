@@ -40,7 +40,6 @@ def check_cooldown(ticker, now, cooldown=5):
     return True
 
 
-import numpy as np
 
 def rsi(closes, period=14):
     if len(closes) < period + 1:

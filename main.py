@@ -74,17 +74,17 @@ async def capital_com_signal():
     
     while True: 
         for ticker in settings.capital_list:
-            side_smc = signal_smc(ticker, timeframe="DAY")
+            side_smc = signal_smc(ticker, timeframe="HOUR_4")
             side_hybrid = signal_hybrid(ticker, timeframe="DAY")
             side_atr_breakout = signal_atr_breakout(ticker, timeframe="DAY")
             side_mean_reversion = signal_mean_reversion(ticker, timeframe="DAY")
             side_momentum = signal_momentum(ticker, timeframe="DAY")
             side_trend_following = signal_trend_following(ticker, timeframe="DAY")
-            side_candle_patterns = signal_candle_patterns(ticker, timeframe="DAY")
+            side_candle_patterns = signal_candle_patterns(ticker, timeframe="HOUR")
 
             # calculate profit and loss levels
-            profit_long, loss_long = get_levels(ticker, TradeSide.LONG, timeframe="DAY", rr=2, notional=amount * get_leverage(ticker))
-            profit_short, loss_short = get_levels(ticker, TradeSide.SHORT, timeframe="DAY", rr=2, notional=amount * get_leverage(ticker))
+            profit_long, loss_long = get_levels(ticker, TradeSide.LONG, timeframe="DAY", notional=amount * get_leverage(ticker))
+            profit_short, loss_short = get_levels(ticker, TradeSide.SHORT, timeframe="DAY", notional=amount * get_leverage(ticker))
 
             # SMC
             if side_smc != TradeSide.NEUTRAL:
