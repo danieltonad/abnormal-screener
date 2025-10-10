@@ -19,7 +19,7 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
         "profit": profit,
         "loss": loss,
         "exit_criteria": [
-            "TP", "STRATEGY", "SL"
+            "TP"
         ]
     }
     if mkt_closed:
