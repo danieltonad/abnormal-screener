@@ -295,7 +295,7 @@ def get_levels(
     timeframe="DAY",
     atr_period=14,
     atr_mult=2.0,     # for SL
-    rr=3.0,           # reward multiplier
+    rr=2.0,           # reward multiplier
     notional=1000.0
 ):
     """

@@ -19,10 +19,13 @@ class JobManager:
         
         # subscribe to capital list
         for epic in settings.capital_list:
-            await asyncio.sleep(5)
+            await asyncio.sleep(2)
+            await memory.preload_history(epic, resolution="MINUTE_15", n=200)
             await memory.preload_history(epic, resolution="HOUR", n=200)
             await memory.preload_history(epic, resolution="HOUR_4", n=200)
             await memory.preload_history(epic, resolution="DAY", n=200)
+
+            await capital_socket.subscribe_to_epic(epic, timeframe="MINUTE_15")
             await capital_socket.subscribe_to_epic(epic, timeframe="HOUR")
             await capital_socket.subscribe_to_epic(epic, timeframe="HOUR_4")
             await capital_socket.subscribe_to_epic(epic, timeframe="DAY")

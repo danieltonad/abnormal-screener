@@ -70,17 +70,18 @@ async def capital_com_signal():
     try:
         from capital_com.signal2 import signal_hybrid, signal_atr_breakout, signal_mean_reversion, signal_momentum, signal_trend_following, get_levels, signal_candle_patterns
         from capital_com.smc import signal_smc
+        from capital_com.lit_snr import signal_lit_snr
         from leverage import get_leverage
         amount = 50
         
         while True: 
             for ticker in settings.capital_list:
                 side_smc = signal_smc(ticker, timeframe="HOUR_4")
-                side_hybrid = signal_hybrid(ticker, timeframe="DAY")
+                # side_hybrid = signal_hybrid(ticker, timeframe="DAY")
                 side_atr_breakout = signal_atr_breakout(ticker, timeframe="DAY")
                 side_mean_reversion = signal_mean_reversion(ticker, timeframe="DAY")
-                side_momentum = signal_momentum(ticker, timeframe="DAY")
-                side_trend_following = signal_trend_following(ticker, timeframe="DAY")
+                side_lit_snr = signal_lit_snr(ticker, timeframe="MINUTE_15")
+                # side_trend_following = signal_trend_following(ticker, timeframe="DAY")
                 side_candle_patterns = signal_candle_patterns(ticker, timeframe="HOUR")
 
                 # calculate profit and loss levels
@@ -94,10 +95,10 @@ async def capital_com_signal():
                     await send_bulk_hook(tickers=[ticker], hook_name="SMC", direction=side_smc, amount=amount, profit=profit, loss=loss, mkt_closed=True)
 
                 # Hybrid signals
-                if side_hybrid != TradeSide.NEUTRAL:
-                    profit = profit_long if side_hybrid == TradeSide.LONG else profit_short
-                    loss = loss_long if side_hybrid == TradeSide.LONG else loss_short
-                    await send_bulk_hook(tickers=[ticker], hook_name="HYBRID", direction=side_hybrid, amount=amount, profit=profit, loss=loss, mkt_closed=True)
+                # if side_hybrid != TradeSide.NEUTRAL:
+                #     profit = profit_long if side_hybrid == TradeSide.LONG else profit_short
+                #     loss = loss_long if side_hybrid == TradeSide.LONG else loss_short
+                #     await send_bulk_hook(tickers=[ticker], hook_name="HYBRID", direction=side_hybrid, amount=amount, profit=profit, loss=loss, mkt_closed=True)
 
                 # ATR Breakout signals
                 if side_atr_breakout != TradeSide.NEUTRAL:
@@ -119,10 +120,10 @@ async def capital_com_signal():
                     await send_bulk_hook(tickers=[ticker], hook_name="CANDLE", direction=side_candle_patterns, amount=amount, profit=profit, loss=loss, mkt_closed=True)
 
                 # Momentum signals
-                # if side_momentum != TradeSide.NEUTRAL:
-                #     profit = profit_long if side_momentum == TradeSide.LONG else profit_short
-                #     loss = loss_long if side_momentum == TradeSide.LONG else loss_short
-                #     await send_bulk_hook(tickers=[ticker], hook_name="MOMENTUM", direction=side_momentum, amount=amount, profit=profit, loss=loss, mkt_closed=True)
+                if side_lit_snr != TradeSide.NEUTRAL:
+                    profit = profit_long if side_lit_snr == TradeSide.LONG else profit_short
+                    loss = loss_long if side_lit_snr == TradeSide.LONG else loss_short
+                    await send_bulk_hook(tickers=[ticker], hook_name="LIT SNR", direction=side_lit_snr, amount=amount, profit=profit, loss=loss, mkt_closed=True)
 
                 # Trend Following signals
                 # if side_trend_following != TradeSide.NEUTRAL:
