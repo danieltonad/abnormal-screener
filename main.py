@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from capital_com import memory
 from capital_com.signals import signal_ema_crossover
 from settings import settings
 from asyncio import sleep, create_task
@@ -80,7 +79,7 @@ async def capital_com_signal():
                 # side_hybrid = signal_hybrid(ticker, timeframe="DAY")
                 side_atr_breakout = signal_atr_breakout(ticker, timeframe="DAY")
                 side_mean_reversion = signal_mean_reversion(ticker, timeframe="DAY")
-                side_lit_snr = signal_lit_snr(ticker, timeframe="MINUTE_15")
+                side_lit_snr = signal_lit_snr(ticker=ticker, trigger_tf="MINUTE_15")
                 # side_trend_following = signal_trend_following(ticker, timeframe="DAY")
                 side_candle_patterns = signal_candle_patterns(ticker, timeframe="HOUR")
 
@@ -101,7 +100,7 @@ async def capital_com_signal():
                 #     await send_bulk_hook(tickers=[ticker], hook_name="HYBRID", direction=side_hybrid, amount=amount, profit=profit, loss=loss, mkt_closed=True)
 
                 # ATR Breakout signals
-                if side_atr_breakout != TradeSide.NEUTRAL:
+                if side_atr_breakout != TradeSide.NEUTRAL and side_atr_breakout != side_smc:
                     profit = profit_long if side_atr_breakout == TradeSide.LONG else profit_short
                     loss = loss_long if side_atr_breakout == TradeSide.LONG else loss_short
                     await send_bulk_hook(tickers=[ticker], hook_name="ATR BRK OUT", direction=side_atr_breakout, amount=amount, profit=profit, loss=loss, mkt_closed=True)
@@ -119,7 +118,7 @@ async def capital_com_signal():
                     loss = loss_long if side_candle_patterns == TradeSide.LONG else loss_short
                     await send_bulk_hook(tickers=[ticker], hook_name="CANDLE", direction=side_candle_patterns, amount=amount, profit=profit, loss=loss, mkt_closed=True)
 
-                # Momentum signals
+                # LIT SNR signals
                 if side_lit_snr != TradeSide.NEUTRAL:
                     profit = profit_long if side_lit_snr == TradeSide.LONG else profit_short
                     loss = loss_long if side_lit_snr == TradeSide.LONG else loss_short
