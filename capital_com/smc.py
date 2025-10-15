@@ -103,7 +103,7 @@ def signal_smc(
     Returns LONG / SHORT / NEUTRAL based on SMC logic.
     Uses bid bars only.
     """
-    bars = [b for b in memory.ohlc_history.get((ticker, timeframe), []) if b["price_type"] == "bid"]
+    bars = [b for b in memory.get_history(ticker, timeframe, 200) if b["price_type"] == "bid"]
     if len(bars) < min_bars:
         return TradeSide.NEUTRAL
 

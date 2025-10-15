@@ -316,9 +316,9 @@ def signal_lit_snr(
     diagnostics = {"ticker": ticker, "steps": []}
 
     # --- fetch bars from memory, like your pipeline ---
-    raw_bias = memory.ohlc_history.get((ticker, bias_tf), []) or []
-    raw_setup = memory.ohlc_history.get((ticker, setup_tf), []) or []
-    raw_trigger = memory.ohlc_history.get((ticker, trigger_tf), []) or []
+    raw_bias = memory.get_history(ticker, bias_tf, 200) or []
+    raw_setup = memory.get_history(ticker, setup_tf, 200) or []
+    raw_trigger = memory.get_history(ticker, trigger_tf, 200) or []
 
     # optionally filter by price_type but fallback to all if filtering removes everything
     bias_bars = [b for b in raw_bias if b.get("price_type", "bid") == "bid"] or raw_bias

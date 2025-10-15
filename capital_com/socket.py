@@ -95,9 +95,9 @@ class CapitalSocket:
     async def unsubscribe_from_epic(self, epic: str, timeframe: str = "MINUTE"):
         """Unsubscribe from real-time data for a given epic."""
         key = f"{epic}_{timeframe}"
-        if key not in self.subscribed_epics:
-            await Logger.app_log(title="UNSUBSCRIBE_SKIP", message=f"{epic} [{timeframe}] not subscribed")
-            return
+        # if key not in self.subscribed_epics:
+        #     await Logger.app_log(title="UNSUBSCRIBE_SKIP", message=f"{epic} [{timeframe}] not subscribed")
+        #     return
 
         try:
             unsubscribe_msg = {
@@ -120,6 +120,7 @@ class CapitalSocket:
 
     async def _listen(self):
         """Listen for incoming WebSocket messages and handle reconnections."""
+        from .event import event_signal  # Avoid circular import
         try:
             while self.running and self.websocket:
                 try:
@@ -149,6 +150,9 @@ class CapitalSocket:
                             close=payload["c"],
                             price_type=payload["priceType"]
                         )
+                        # Trigger event signal processing
+                        await event_signal(payload["epic"], payload["resolution"])
+
 
                 except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosedError) as e:
                     await Logger.app_log(title="WS_LISTEN_ERR", message=str(e))
@@ -182,6 +186,7 @@ class CapitalSocket:
                 try:
                     await asyncio.sleep(delay)
                     await self.connect_websocket()
+                    
                     # Resubscribe to all previous epics
                     for key in list(self.subscribed_epics):
                         epic, timeframe = key.rsplit("_", 1)

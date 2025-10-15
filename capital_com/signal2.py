@@ -12,7 +12,7 @@ def signal_trend_following(
     breakout_period=20,
     exit_period=10,
 ):
-    bars = [b for b in memory.ohlc_history.get((ticker, timeframe), []) if b["price_type"] == "bid"]
+    bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
 
     if len(bars) < breakout_period + exit_period:
         return TradeSide.NEUTRAL
@@ -52,7 +52,7 @@ def signal_momentum(
     timeframe="DAY",
     lookback=60,
 ):
-    bars = [b for b in memory.ohlc_history.get((ticker, timeframe), []) if b["price_type"] == "bid"]
+    bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
 
     if len(bars) < lookback + 1:
         return TradeSide.NEUTRAL
@@ -87,7 +87,7 @@ def signal_mean_reversion(
     oversold=10,
     overbought=90,
 ):
-    bars = [b for b in memory.ohlc_history.get((ticker, timeframe), []) if b["price_type"] == "bid"]
+    bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
 
     if len(bars) < rsi_period + 1:
         return TradeSide.NEUTRAL
@@ -118,7 +118,7 @@ def signal_atr_breakout(
     atr_period=20,
     atr_mult=1.0,
 ):
-    bars = [b for b in memory.ohlc_history.get((ticker, timeframe), []) if b["price_type"] == "bid"]
+    bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
 
     if len(bars) < atr_period + 2:
         return TradeSide.NEUTRAL
@@ -151,7 +151,7 @@ def signal_hybrid(
     oversold=10,
     overbought=90,
 ):
-    bars = [b for b in memory.ohlc_history.get((ticker, timeframe), []) if b["price_type"] == "bid"]
+    bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
 
     if len(bars) < max(sma_period, rsi_period + 1):
         return TradeSide.NEUTRAL
@@ -189,7 +189,7 @@ def signal_candle_patterns(
     sma_period=20
 ):
     bars = [
-        b for b in memory.ohlc_history.get((ticker, timeframe), [])
+        b for b in memory.get_history(ticker, timeframe)
         if b["price_type"] == "bid"
     ]
 
@@ -295,13 +295,13 @@ def get_levels(
     timeframe="DAY",
     atr_period=14,
     atr_mult=2.0,     # for SL
-    rr=2.0,           # reward multiplier
+    rr=4.0,           # reward multiplier
     notional=1000.0
 ):
     """
     Returns (SL$, TP$) tuple at chosen RR.
     """
-    bars = [b for b in memory.ohlc_history.get((ticker, timeframe), []) if b["price_type"] == "bid"]
+    bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
     if len(bars) < atr_period + 1:
         return 50, 50 # default
 

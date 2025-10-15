@@ -151,7 +151,7 @@ async def startup_event():
     # create_task(crypto_ema_monitor(TradeTimeFrame.ONE_MIN))
     # create_task(stocks_ema_monitor(TradeTimeFrame.ONE_MIN))
     # create_task(etf_ema_monitor(TradeTimeFrame.ONE_MIN))
-    create_task(capital_com_signal())
+    # create_task(capital_com_signal())
 
 
 @app.on_event("shutdown")
