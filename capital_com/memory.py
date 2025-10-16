@@ -4,7 +4,7 @@ from logger import Logger
 import json, asyncio
 from typing import Dict, Tuple, Deque
 from collections import defaultdict, deque
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 
@@ -18,16 +18,49 @@ class Memory:
 
 
     @staticmethod
-    def _parse_ts(ts: str):
+    def _parse_ts(ts):
         """
         Normalize timestamp to datetime for strict comparison.
-        Capital.com returns ISO8601 UTC format, but handle safely.
+        Supports both ISO8601 strings and Unix timestamps (ms or s).
         """
+        from datetime import datetime, timezone
+
         try:
-            # Example: "2025-10-13T12:00:00.000Z"
+            # Numeric (epoch in ms or s)
+            if isinstance(ts, (int, float)):
+                # detect ms vs s by magnitude
+                if ts > 1e12:  # milliseconds
+                    ts /= 1000
+                return datetime.fromtimestamp(ts, tz=timezone.utc)
+
+            # String numeric (e.g. "1760616900000")
+            if isinstance(ts, str) and ts.isdigit():
+                ts = int(ts)
+                if ts > 1e12:
+                    ts /= 1000
+                return datetime.fromtimestamp(ts, tz=timezone.utc)
+
+            # ISO8601 string
             return datetime.fromisoformat(ts.replace("Z", "+00:00"))
         except Exception:
             return None
+
+
+    @staticmethod
+    def iso_to_unix_ms(ts_str: str) -> int:
+        """
+        Convert an ISO8601 timestamp like '2025-10-16T13:05:00'
+        to a Unix timestamp in milliseconds (UTC).
+        """
+        # Parse the ISO string
+        dt = datetime.fromisoformat(ts_str)
+
+        # Assume it's UTC if no timezone info
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+
+        # Convert to milliseconds since epoch
+        return int(dt.timestamp() * 1000)
 
     def update_ohlc_data(self, epic: str, resolution: str, timestamp: str, open: float, high: float, low: float, close: float, price_type: str):
         """Update OHLC data (latest + history) for an epic/resolution."""
@@ -40,6 +73,7 @@ class Memory:
         ts_obj = self._parse_ts(timestamp)
         if ts_obj is None:
             # Invalid timestamp format — skip
+            print(f"Invalid timestamp: {timestamp}")
             return
 
         bar = {
@@ -51,6 +85,7 @@ class Memory:
             "c": float(close),
             "price_type": "bid",
         }
+
 
         # --- Strict chronological logic ---
         if not dq:
@@ -154,7 +189,7 @@ class Memory:
                 self.update_ohlc_data(
                     epic=epic,
                     resolution=resolution,
-                    timestamp=t,
+                    timestamp=self.iso_to_unix_ms(t),
                     open=o,
                     high=h,
                     low=l,
@@ -163,7 +198,7 @@ class Memory:
                 )
 
             # Return clean chronological list
-            return self.get_history(epic, resolution, n)
+            # return self.get_history(epic, resolution, n)
 
         except Exception as e:
             await Logger.app_log(title="PRELOAD_HISTORY_ERR", message=f"{epic}: {str(e)}")

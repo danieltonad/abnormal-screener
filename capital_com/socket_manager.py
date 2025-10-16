@@ -69,6 +69,7 @@ class CapitalSocketManager:
 
     async def resubscribe_all(self):
         """Resubscribe all epic/timeframes after reconnects."""
+        print("RESUBSCRIBING ALL EPICS")
         temp_map = self.subscription_map.copy()
         self.subscription_map.clear()
         self.socket_assignments.clear()

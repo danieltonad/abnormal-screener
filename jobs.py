@@ -13,7 +13,7 @@ class JobManager:
         from settings import settings
         # Schedule periodic tasks
         scheduler.add_job(memory.update_auth_header, IntervalTrigger(minutes=7), id="update_auth_header")
-        scheduler.add_job(capital_socket.ping_all, IntervalTrigger(minutes=5), id="ping_socket")
+        # scheduler.add_job(capital_socket.ping_all, IntervalTrigger(minutes=5), id="ping_socket")
 
         await memory.update_auth_header()
         

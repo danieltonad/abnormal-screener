@@ -3,7 +3,7 @@ import asyncio
 import json
 from .memory import memory
 from logger import Logger
-from settings import settings
+from uuid import uuid4
 
 
 class CapitalSocket:
@@ -13,7 +13,10 @@ class CapitalSocket:
         self.subscribed_epics = set()
         self._listen_task = None
         self._reconnect_lock = asyncio.Lock()
-        self._ping_interval = 30  # seconds
+        self._ping_interval = 50
+        self.correlation_id = str(uuid4())
+
+    
 
     async def connect_websocket(self):
         """Connect to Capital.com WebSocket if not already connected."""
@@ -50,7 +53,7 @@ class CapitalSocket:
 
             ping_msg = {
                 "destination": "ping",
-                "correlationId": "ping_XGXXXTX",
+                "correlationId": f"SOCKET_{self.correlation_id}",
                 "cst": memory.capital_auth_header["CST"],
                 "securityToken": memory.capital_auth_header["X-SECURITY-TOKEN"]
             }
@@ -58,17 +61,15 @@ class CapitalSocket:
 
         except Exception as e:
             await Logger.app_log(title="PING_ERR", message=f"Ping failed: {str(e)}")
-            await self._schedule_reconnect()
+            await asyncio.sleep(5)
+            await self.ping_socket()
 
     async def subscribe_to_epic(self, epic: str, timeframe: str = "MINUTE"):
         """Subscribe to real-time data for a given epic."""
         try:
             await self.connect_websocket()
+            key = f"{epic}<=>{timeframe}"
 
-            key = f"{epic}_{timeframe}"
-            if key in self.subscribed_epics:
-                await Logger.app_log(title="SUBSCRIBE_SKIP", message=f"{epic} [{timeframe}] already subscribed")
-                return
 
             subscribe_msg = {
                 "destination": "OHLCMarketData.subscribe",
@@ -82,7 +83,8 @@ class CapitalSocket:
                 }
             }
             await self.websocket.send(json.dumps(subscribe_msg))
-            self.subscribed_epics.add(key)
+            if key not in self.subscribed_epics:
+                self.subscribed_epics.add(key)
             await Logger.app_log(title="SUBSCRIBE_SENT", message=f"Subscribed to {epic} [{timeframe}]")
 
         except Exception as e:
@@ -94,11 +96,6 @@ class CapitalSocket:
 
     async def unsubscribe_from_epic(self, epic: str, timeframe: str = "MINUTE"):
         """Unsubscribe from real-time data for a given epic."""
-        key = f"{epic}_{timeframe}"
-        # if key not in self.subscribed_epics:
-        #     await Logger.app_log(title="UNSUBSCRIBE_SKIP", message=f"{epic} [{timeframe}] not subscribed")
-        #     return
-
         try:
             unsubscribe_msg = {
                 "destination": "OHLCMarketData.unsubscribe",
@@ -112,7 +109,6 @@ class CapitalSocket:
                 }
             }
             await self.websocket.send(json.dumps(unsubscribe_msg))
-            self.subscribed_epics.remove(key)
             await Logger.app_log(title="UNSUBSCRIBE_SENT", message=f"Unsubscribed from {epic} [{timeframe}]")
 
         except Exception as e:
@@ -164,6 +160,8 @@ class CapitalSocket:
         finally:
             await self._schedule_reconnect()
 
+    
+    
     async def _schedule_reconnect(self):
         """Ensure only one reconnect happens at a time."""
         async with self._reconnect_lock:
@@ -189,7 +187,7 @@ class CapitalSocket:
                     
                     # Resubscribe to all previous epics
                     for key in list(self.subscribed_epics):
-                        epic, timeframe = key.rsplit("_", 1)
+                        epic, timeframe = tuple(key.split("<=>"))
                         await self.subscribe_to_epic(epic, timeframe)
                         await asyncio.sleep(0.2)
                     return

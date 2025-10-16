@@ -291,7 +291,6 @@ def signal_candle_patterns(
 
 def get_levels(
     ticker: str,
-    side,
     timeframe="DAY",
     atr_period=14,
     atr_mult=2.0,     # for SL

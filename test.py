@@ -29,7 +29,23 @@ async def socket_test():
     from capital_com.smc import signal_smc
 
     await memory.update_auth_header()
-    print(memory.capital_auth_header)
+    
+
+    from capital_com.socket_manager import capital_socket
+
+    # await capital_socket.subscribe("US100", "MINUTE")
+
+    await memory.preload_history("US100", resolution="MINUTE", n=5)
+    print(memory.get_history(epic="US100", resolution="MINUTE"), end="\n\n\n")
+
+
+    # while True:
+    #     await asyncio.sleep(30)
+
+    #     print(memory.get_history(epic="US100", resolution="MINUTE"), end="\n\n\n")
+    #     await capital_socket.ping_all()
+
+
 
 
 
