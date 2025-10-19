@@ -26,7 +26,7 @@ def get_instrument_type(epic: str) -> EpicInstrument:
         "USDCHF", "USDCNY", "USDMXN", "GBPAUD", "CADJPY",
         "USDZAR", "USDTRY", "AUDJPY", "NZDJPY"
     }
-    cryptos = {"BTCUSD", "ETHUSD"}
+    cryptos = {"BTCUSD", "ETHUSD", "BNBUSD", "SOLUSD"}
     indices = {"QQQ", "SPY", "IWM", "VOO", "US100", "US500", "US30"}
     commodities = {"GOLD", "SILVER", "OIL_CRUDE", "OIL_BRENT", "NATGAS"}
 

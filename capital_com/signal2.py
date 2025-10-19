@@ -1,4 +1,4 @@
-from .utils import atr, rsi, sma
+from .utils import atr, ema, rsi, sma
 from enums.trade import TradeSide
 from .memory import memory
 import numpy as np
@@ -84,30 +84,62 @@ def signal_mean_reversion(
     ticker: str,
     timeframe="DAY",
     rsi_period=2,
-    oversold=10,
-    overbought=90,
+    base_oversold=10,
+    base_overbought=90,
+    trend_len=50,
+    vol_window=14,
 ):
-    bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
+    try:
+        bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
+        if len(bars) < max(rsi_period, trend_len) + 1:
+            return TradeSide.NEUTRAL
 
-    if len(bars) < rsi_period + 1:
+        closes = [b["c"] for b in bars]
+
+        # --- Safe extractors ---
+        def safe_last(val):
+            """Handles None, float, list, np.ndarray safely"""
+            if val is None:
+                return None
+            if isinstance(val, (list, tuple, np.ndarray)):
+                return val[-1] if len(val) > 0 else None
+            return val  # scalar (float/int)
+        
+        # --- Indicator values ---
+        rsi_val = safe_last(rsi(closes, rsi_period))
+        ema_50 = safe_last(ema(closes, trend_len))
+        atr_val = safe_last(atr(bars, vol_window))
+
+        # If any core indicator couldn't be computed yet, skip
+        if rsi_val is None or ema_50 is None or atr_val is None:
+            return TradeSide.NEUTRAL
+
+        avg_range = sum([b["h"] - b["l"] for b in bars[-vol_window:]]) / vol_window
+
+        # --- Trend Soft Bias ---
+        trend_bias = (closes[-1] - ema_50) / ema_50 if ema_50 else 0
+        bias = 1 if trend_bias > 0 else (-1 if trend_bias < 0 else 0)
+        
+        # --- Adaptive RSI thresholds ---
+        oversold = base_oversold + (5 if bias > 0 else 0)
+        overbought = base_overbought - (5 if bias < 0 else 0)
+
+        # --- Volatility sanity check ---
+        if atr_val > avg_range * 1.5:  # skip during high volatility bursts
+            return TradeSide.NEUTRAL
+
+        # --- Entry logic ---
+        if rsi_val < oversold and bias >= 0:
+            return TradeSide.LONG
+        elif rsi_val > overbought and bias <= 0:
+            return TradeSide.SHORT
+        else:
+            return TradeSide.NEUTRAL
+
+    except Exception as e:
+        print("Error in mean reversion signal:", str(e))
         return TradeSide.NEUTRAL
 
-    closes = [b["c"] for b in bars]
-    rsi_val = rsi(closes, rsi_period)
-    if isinstance(rsi_val, list):
-        rsi_val = rsi_val[-1]
-
-    if rsi_val is None:
-        return TradeSide.NEUTRAL
-
-    last = bars[-1]
-
-    if rsi_val < oversold:
-        return TradeSide.LONG
-    elif rsi_val > overbought:
-        return TradeSide.SHORT
-    else:
-        return TradeSide.NEUTRAL
 
 
 

@@ -17,7 +17,7 @@ async def event_signal(ticker: str, timeframe: str):
             side_atr_breakout = signal_atr_breakout(ticker, timeframe=timeframe)
             side_smc = signal_smc(ticker, timeframe="HOUR_4")
 
-            profit, loss = get_levels(ticker, TradeSide.LONG, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=2)
+            profit, loss = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=2)
 
             # ATR Breakout signals
             if side_atr_breakout != TradeSide.NEUTRAL and side_atr_breakout != side_smc:
@@ -32,7 +32,7 @@ async def event_signal(ticker: str, timeframe: str):
         elif timeframe == "HOUR":
             side_candle_patterns = signal_candle_patterns(ticker, timeframe="HOUR")
 
-            profit, loss = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=2)
+            profit, loss = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=3)
 
             # candle pattern signals
             if side_candle_patterns != TradeSide.NEUTRAL:
@@ -53,8 +53,8 @@ async def event_signal(ticker: str, timeframe: str):
         
 
 
-        elif timeframe == "MINUTE_15":
-            side_lit_snr = signal_lit_snr(ticker=ticker, trigger_tf=timeframe)
+        elif timeframe == "MINUTE_30":
+            side_lit_snr = signal_lit_snr(ticker=ticker, trigger_tf=timeframe, bias_tf="DAY", setup_tf="HOUR_4")
 
             profit, loss = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=4)
 
