@@ -143,6 +143,81 @@ def signal_mean_reversion(
 
 
 
+# Enhanced Mean Reversion (RSI + Trend + Volatility-Adaptive)
+def signal_mean_reversion_v2(
+    ticker: str,
+    timeframe="DAY",
+    rsi_period=3,               # Slightly longer RSI for smoother signals
+    base_oversold=15,           # Slightly wider zones
+    base_overbought=85,
+    trend_len=50,
+    vol_window=14,
+    smooth_rsi=True,            # Option to smooth RSI
+    rsi_smooth_period=3,        # RSI smoothing factor
+    atr_filter=2.0,             # ATR burst threshold
+    bias_sensitivity=0.005,     # Minimum bias magnitude for trend filter
+):
+    try:
+        bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
+        if len(bars) < max(rsi_period, trend_len, vol_window) + 2:
+            return TradeSide.NEUTRAL
+
+        closes = [b["c"] for b in bars]
+        highs = [b["h"] for b in bars]
+        lows = [b["l"] for b in bars]
+
+        def safe_last(val):
+            if val is None:
+                return None
+            if isinstance(val, (list, tuple, np.ndarray)):
+                return val[-1] if len(val) > 0 else None
+            return val
+
+        # --- Core indicators ---
+        raw_rsi = rsi(closes, rsi_period)
+        if smooth_rsi and len(raw_rsi) >= rsi_smooth_period:
+            # Simple moving average smoothing on RSI
+            rsi_vals = [np.mean(raw_rsi[i - rsi_smooth_period + 1 : i + 1]) 
+                        for i in range(rsi_smooth_period - 1, len(raw_rsi))]
+            rsi_val = safe_last(rsi_vals)
+        else:
+            rsi_val = safe_last(raw_rsi)
+
+        ema_50 = safe_last(ema(closes, trend_len))
+        atr_val = safe_last(atr(bars, vol_window))
+        avg_range = np.mean([h - l for h, l in zip(highs[-vol_window:], lows[-vol_window:])])
+
+        if rsi_val is None or ema_50 is None or atr_val is None:
+            return TradeSide.NEUTRAL
+
+        # --- Trend bias calculation ---
+        trend_bias = (closes[-1] - ema_50) / ema_50 if ema_50 else 0
+        bias = 1 if trend_bias > bias_sensitivity else (-1 if trend_bias < -bias_sensitivity else 0)
+
+        # --- Adaptive RSI thresholds ---
+        # Wider bands when volatility is high, narrower when calm
+        vol_factor = min(1.5, max(0.5, atr_val / avg_range))
+        oversold = base_oversold + (5 if bias > 0 else 0) * vol_factor
+        overbought = base_overbought - (5 if bias < 0 else 0) * vol_factor
+
+        # --- Volatility filter ---
+        if atr_val > avg_range * atr_filter:
+            return TradeSide.NEUTRAL
+
+        # --- Entry logic ---
+        if rsi_val < oversold and bias >= 0:
+            return TradeSide.LONG
+        elif rsi_val > overbought and bias <= 0:
+            return TradeSide.SHORT
+        else:
+            return TradeSide.NEUTRAL
+
+    except Exception as e:
+        print("Error in mean reversion signal v2:", str(e))
+        return TradeSide.NEUTRAL
+
+
+
 # Breakout + ATR Buffer
 def signal_atr_breakout(
     ticker: str,
@@ -349,7 +424,7 @@ def get_levels(
     tp_dist = sl_dist * rr
 
     # convert to dollar PnL
-    sl_pnl = notional * (sl_dist / entry)
+    sl_pnl = max(notional * (sl_dist / entry), 10)  # min $10 SL
     tp_pnl = notional * (tp_dist / entry)
 
     return (int(tp_pnl), int(sl_pnl))

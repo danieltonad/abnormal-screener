@@ -5,7 +5,7 @@ async def event_signal(ticker: str, timeframe: str):
     from enums.trade import TradeSide
     from hook import send_bulk_hook
     try:
-        from capital_com.signal2 import signal_hybrid, signal_atr_breakout, signal_mean_reversion, signal_momentum, signal_trend_following, get_levels, signal_candle_patterns
+        from capital_com.signal2 import signal_hybrid, signal_atr_breakout, signal_mean_reversion, signal_mean_reversion_v2, get_levels, signal_candle_patterns
         from capital_com.smc import signal_smc
         from capital_com.lit_snr import signal_lit_snr
         from leverage import get_leverage
@@ -29,14 +29,14 @@ async def event_signal(ticker: str, timeframe: str):
         
         
         
-        elif timeframe == "HOUR":
-            side_candle_patterns = signal_candle_patterns(ticker, timeframe="HOUR")
+        # elif timeframe == "HOUR":
+        #     side_candle_patterns = signal_candle_patterns(ticker, timeframe="HOUR")
 
-            profit, loss = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=3)
+        #     profit, loss = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=3)
 
-            # candle pattern signals
-            if side_candle_patterns != TradeSide.NEUTRAL:
-                await send_bulk_hook(tickers=[ticker], hook_name="CANDLE", direction=side_candle_patterns, amount=amount, profit=profit, loss=loss, mkt_closed=True)
+        #     # candle pattern signals
+        #     if side_candle_patterns != TradeSide.NEUTRAL:
+        #         await send_bulk_hook(tickers=[ticker], hook_name="CANDLE", direction=side_candle_patterns, amount=amount, profit=profit, loss=loss, mkt_closed=True)
 
 
         

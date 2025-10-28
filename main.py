@@ -105,8 +105,8 @@ async def capital_com_signal():
 
 
         # candle pattern signals
-        if side_candle_patterns != TradeSide.NEUTRAL:
-            await send_bulk_hook(tickers=[ticker], hook_name="CANDLE", direction=side_candle_patterns, amount=amount, profit=profit, loss=loss, mkt_closed=True)
+        # if side_candle_patterns != TradeSide.NEUTRAL:
+        #     await send_bulk_hook(tickers=[ticker], hook_name="CANDLE", direction=side_candle_patterns, amount=amount, profit=profit, loss=loss, mkt_closed=True)
 
         # LIT SNR signals
         if side_lit_snr != TradeSide.NEUTRAL:
@@ -139,7 +139,7 @@ async def startup_event():
     # create_task(crypto_ema_monitor(TradeTimeFrame.ONE_MIN))
     # create_task(stocks_ema_monitor(TradeTimeFrame.ONE_MIN))
     # create_task(etf_ema_monitor(TradeTimeFrame.ONE_MIN))
-    await capital_com_signal()
+    # await capital_com_signal()
 
 
 @app.on_event("shutdown")

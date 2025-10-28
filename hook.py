@@ -3,7 +3,7 @@ from enums.trade import TradeSide
 import asyncio
 
 
-async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, session: AsyncClient, mkt_closed: bool = False):
+async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, session: AsyncClient, mkt_closed: bool = False, recalibrate: bool = True):
     from settings import settings
     ticker = settings.ticker_mask(ticker)
     if ticker not in settings.watchlist:
@@ -19,11 +19,13 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
         "profit": profit,
         "loss": loss,
         "exit_criteria": [
-            "TP"
+            "TP", "SL"
         ]
     }
     if mkt_closed:
         payload["exit_criteria"].append("EOW_CLOSE")
+    if recalibrate:
+        payload["exit_criteria"].append("RECALIBRATE")
     res = await session.post(url, json=payload)
     print(f"{hook_name} Hook | {ticker}: {res.status_code} -> {direction} | TP: ${profit} | SL: ${loss}")
 
