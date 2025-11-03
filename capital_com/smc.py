@@ -158,7 +158,7 @@ def signal_smc(
         upper_wick = last["h"] - max(last["c"], last["o"])
         if impulse_ok and upper_wick > 0.5 * abs(last["c"] - last["o"]):
             confirmations += 1
-        if confirmations:
+        if confirmations > confirmation_required:
             return TradeSide.SHORT
 
     return TradeSide.NEUTRAL

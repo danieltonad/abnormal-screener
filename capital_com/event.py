@@ -8,7 +8,7 @@ async def event_signal(ticker: str, timeframe: str):
         from capital_com.signal2 import signal_hybrid, signal_atr_breakout, signal_mean_reversion, signal_mean_reversion_v2, get_levels, signal_candle_patterns
         from capital_com.smc import signal_smc
         from capital_com.lit_snr import signal_lit_snr
-        from leverage import get_leverage
+        from leverage import get_leverage, get_instrument_type, EpicInstrument
         amount = 50
         # calculate profit and loss levels
 
@@ -17,7 +17,7 @@ async def event_signal(ticker: str, timeframe: str):
             side_atr_breakout = signal_atr_breakout(ticker, timeframe=timeframe)
             side_smc = signal_smc(ticker, timeframe="HOUR_4")
 
-            profit, loss = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=2)
+            profit, loss = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=2, atr_mult=1)
 
             # ATR Breakout signals
             if side_atr_breakout != TradeSide.NEUTRAL and side_atr_breakout != side_smc:
@@ -27,16 +27,6 @@ async def event_signal(ticker: str, timeframe: str):
             if side_mean_reversion != TradeSide.NEUTRAL:
                 await send_bulk_hook(tickers=[ticker], hook_name="MEAN REV", direction=side_mean_reversion, amount=amount, profit=profit, loss=loss, mkt_closed=True)
         
-        
-        
-        # elif timeframe == "HOUR":
-        #     side_candle_patterns = signal_candle_patterns(ticker, timeframe="HOUR")
-
-        #     profit, loss = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=3)
-
-        #     # candle pattern signals
-        #     if side_candle_patterns != TradeSide.NEUTRAL:
-        #         await send_bulk_hook(tickers=[ticker], hook_name="CANDLE", direction=side_candle_patterns, amount=amount, profit=profit, loss=loss, mkt_closed=True)
 
 
         
@@ -53,7 +43,7 @@ async def event_signal(ticker: str, timeframe: str):
         
 
 
-        elif timeframe == "MINUTE_30":
+        elif timeframe == "MINUTE_30" and get_instrument_type(ticker) in [EpicInstrument.CRYPTO, EpicInstrument.INDICES, EpicInstrument.COMMODITIES]:
             side_lit_snr = signal_lit_snr(ticker=ticker, trigger_tf=timeframe, bias_tf="DAY", setup_tf="HOUR_4")
 
             profit, loss = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=4)

@@ -1,7 +1,8 @@
-from .utils import atr, ema, rsi, sma
+from .utils import atr, ema, rsi, sma, atr_from_df
 from enums.trade import TradeSide
 from .memory import memory
 import numpy as np
+import pandas as pd
 from datetime import datetime
 
 
@@ -83,62 +84,54 @@ def signal_momentum(
 def signal_mean_reversion(
     ticker: str,
     timeframe="DAY",
-    rsi_period=2,
-    base_oversold=10,
-    base_overbought=90,
-    trend_len=50,
+    rsi_period=14,          # ← changed from 2
+    base_oversold=30,       # ← changed from 10
+    base_overbought=70,     # ← changed from 90
+    ema_fast=20,
+    ema_slow=50,
     vol_window=14,
 ):
-    try:
-        bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
-        if len(bars) < max(rsi_period, trend_len) + 1:
-            return TradeSide.NEUTRAL
-
-        closes = [b["c"] for b in bars]
-
-        # --- Safe extractors ---
-        def safe_last(val):
-            """Handles None, float, list, np.ndarray safely"""
-            if val is None:
-                return None
-            if isinstance(val, (list, tuple, np.ndarray)):
-                return val[-1] if len(val) > 0 else None
-            return val  # scalar (float/int)
-        
-        # --- Indicator values ---
-        rsi_val = safe_last(rsi(closes, rsi_period))
-        ema_50 = safe_last(ema(closes, trend_len))
-        atr_val = safe_last(atr(bars, vol_window))
-
-        # If any core indicator couldn't be computed yet, skip
-        if rsi_val is None or ema_50 is None or atr_val is None:
-            return TradeSide.NEUTRAL
-
-        avg_range = sum([b["h"] - b["l"] for b in bars[-vol_window:]]) / vol_window
-
-        # --- Trend Soft Bias ---
-        trend_bias = (closes[-1] - ema_50) / ema_50 if ema_50 else 0
-        bias = 1 if trend_bias > 0 else (-1 if trend_bias < 0 else 0)
-        
-        # --- Adaptive RSI thresholds ---
-        oversold = base_oversold + (5 if bias > 0 else 0)
-        overbought = base_overbought - (5 if bias < 0 else 0)
-
-        # --- Volatility sanity check ---
-        if atr_val > avg_range * 1.5:  # skip during high volatility bursts
-            return TradeSide.NEUTRAL
-
-        # --- Entry logic ---
-        if rsi_val < oversold and bias >= 0:
-            return TradeSide.LONG
-        elif rsi_val > overbought and bias <= 0:
-            return TradeSide.SHORT
-        else:
-            return TradeSide.NEUTRAL
-
-    except Exception as e:
-        print("Error in mean reversion signal:", str(e))
+    bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
+    min_bars = max(rsi_period, ema_slow, vol_window) + 5
+    if len(bars) < min_bars:
         return TradeSide.NEUTRAL
+
+    closes = [b["c"] for b in bars]
+
+    def safe_last(val):
+        if val is None:
+            return None
+        if isinstance(val, (list, tuple, np.ndarray)):
+            return val[-1] if len(val) > 0 else None
+        return val
+
+    rsi_val = safe_last(rsi(closes, rsi_period))
+    ema_fast_val = safe_last(ema(closes, ema_fast))
+    ema_slow_val = safe_last(ema(closes, ema_slow))
+    atr_val = safe_last(atr(bars, vol_window))
+
+    if None in (rsi_val, ema_fast_val, ema_slow_val, atr_val):
+        return TradeSide.NEUTRAL
+
+    # --- Stronger trend filter ---
+    in_uptrend = ema_fast_val > ema_slow_val
+    in_downtrend = ema_fast_val < ema_slow_val
+
+    # --- Volatility filter (keep your logic) ---
+    avg_range = sum(b["h"] - b["l"] for b in bars[-vol_window:]) / vol_window
+    if atr_val > avg_range * 1.5:
+        return TradeSide.NEUTRAL
+
+    # --- Mean Reversion Logic ---
+    # Only buy oversold if NOT in strong uptrend
+    if rsi_val < base_oversold and not in_uptrend:
+        return TradeSide.LONG
+
+    # Only sell overbought if NOT in strong downtrend
+    if rsi_val > base_overbought and not in_downtrend:
+        return TradeSide.SHORT
+
+    return TradeSide.NEUTRAL
 
 
 
@@ -224,23 +217,44 @@ def signal_atr_breakout(
     timeframe="DAY",
     atr_period=20,
     atr_mult=1.0,
+    ema_period=50,
+    swing_lookback=5,  # recent swing high/low window
 ):
     bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
-
-    if len(bars) < atr_period + 2:
+    min_required = max(atr_period, ema_period, swing_lookback) + 2
+    if len(bars) < min_required:
         return TradeSide.NEUTRAL
 
-    last = bars[-1]
-    prev = bars[-2]
+    # Extract price series
+    closes = np.array([b["c"] for b in bars])
+    highs = np.array([b["h"] for b in bars])
+    lows = np.array([b["l"] for b in bars])
 
-    vol = atr(bars, atr_period)
-    if isinstance(vol, list):
-        vol = vol[-1]
-    buffer = atr_mult * vol if vol else 0
+    # ATR
+    vol = atr_from_df(pd.DataFrame(bars), atr_period)
+    if vol is None or vol == 0:
+        return TradeSide.NEUTRAL
+    buffer = atr_mult * vol
 
-    if last["c"] > prev["h"] + buffer:
+    # EMA trend filter
+    ema_vals = ema(closes, ema_period)
+    current_price = closes[-1]
+    current_ema = ema_vals[-1]
+    trend_up = current_price > current_ema
+    trend_down = current_price < current_ema
+
+    # Recent swing high/low (excluding current bar)
+    recent_high = highs[-(swing_lookback+1):-1].max()
+    recent_low = lows[-(swing_lookback+1):-1].min()
+
+    last_close = closes[-1]
+
+    # Long: breakout above swing high + buffer AND in uptrend
+    if last_close > recent_high + buffer and trend_up:
         return TradeSide.LONG
-    elif last["c"] < prev["l"] - buffer:
+
+    # Short: breakdown below swing low - buffer AND in downtrend
+    if last_close < recent_low - buffer and trend_down:
         return TradeSide.SHORT
 
     return TradeSide.NEUTRAL
@@ -424,7 +438,7 @@ def get_levels(
     tp_dist = sl_dist * rr
 
     # convert to dollar PnL
-    sl_pnl = max(notional * (sl_dist / entry), 10)  # min $10 SL
+    sl_pnl = notional * (sl_dist / entry)  # min $20 SL
     tp_pnl = notional * (tp_dist / entry)
 
     return (int(tp_pnl), int(sl_pnl))

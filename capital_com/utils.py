@@ -28,6 +28,14 @@ def atr(bars, period=14):
         trs.append(tr)
     return np.mean(trs[-period:]) if len(trs) >= period else []
 
+def atr_from_df(df, period=14):
+    if len(df) < period + 1:
+        return None
+    high, low, close = df["h"], df["l"], df["c"]
+    tr = np.maximum(high - low,
+            np.maximum(abs(high - close.shift(1)), abs(low - close.shift(1))))
+    return tr.rolling(window=period, min_periods=1).mean().iloc[-1]
+
 
 def check_cooldown(ticker, now, cooldown=5):
     """Prevent multiple trades within cooldown minutes."""

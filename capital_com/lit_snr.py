@@ -2,6 +2,7 @@ from enums.trade import TradeSide
 from typing import List, Dict, Optional, Tuple, Any
 from .memory import memory
 import math
+import numpy as np
 
 # === Utility helpers ===
 def is_number(x) -> bool:
@@ -308,19 +309,18 @@ def signal_lit_snr(
     debug: bool = False,
 ) -> Any:
     """
-    Returns TradeSide.LONG / SHORT / NEUTRAL based on L.I.T + Malaysia SNR logic.
-
-    If debug=True, returns (TradeSide, diagnostics_dict) where diagnostics_dict explains
-    why the signal was produced (useful for testing/backtesting).
+    Refined swing-trading version with:
+      • ATR-adaptive SNR zones
+      • Volatility regime filter
+      • Weighted confirmation scoring
     """
+
     diagnostics = {"ticker": ticker, "steps": []}
 
-    # --- fetch bars from memory, like your pipeline ---
     raw_bias = memory.get_history(ticker, bias_tf, 200) or []
     raw_setup = memory.get_history(ticker, setup_tf, 200) or []
     raw_trigger = memory.get_history(ticker, trigger_tf, 200) or []
 
-    # optionally filter by price_type but fallback to all if filtering removes everything
     bias_bars = [b for b in raw_bias if b.get("price_type", "bid") == "bid"] or raw_bias
     setup_bars = [b for b in raw_setup if b.get("price_type", "bid") == "bid"] or raw_setup
     trigger_bars = [b for b in raw_trigger if b.get("price_type", "bid") == "bid"] or raw_trigger
@@ -331,82 +331,90 @@ def signal_lit_snr(
         "trigger_bars": len(trigger_bars),
     }
 
-    # basic availability checks
     if len(bias_bars) < min_bars_bias or len(setup_bars) < min_bars_setup or len(trigger_bars) < min_bars_trigger:
         diagnostics["steps"].append("insufficient_bars")
-        if debug:
-            return TradeSide.NEUTRAL, diagnostics
-        return TradeSide.NEUTRAL
+        return (TradeSide.NEUTRAL, diagnostics) if debug else TradeSide.NEUTRAL
 
-    # --- Step 1: determine bias on H4 ---
-    bias = market_structure_bias(bias_bars, swing_lookback=60)  # bullish / bearish / neutral
+    # --- Step 1: Bias ---
+    bias = market_structure_bias(bias_bars, swing_lookback=60)
     diagnostics["bias"] = bias
     if bias == "neutral" and allow_neutral_if_no_bias:
         diagnostics["steps"].append("neutral_bias")
-        if debug:
-            return TradeSide.NEUTRAL, diagnostics
-        return TradeSide.NEUTRAL
+        return (TradeSide.NEUTRAL, diagnostics) if debug else TradeSide.NEUTRAL
 
-    # --- Step 2: find SNR zones on H1 and nearest zone to price ---
-    zones = find_snr_zones(setup_bars, lookback=snr_lookback)
+    # --- Step 2: Volatility regime (ATR) ---
+    atr = simple_atr(setup_bars, period=14)
+    if not is_number(atr):
+        diagnostics["steps"].append("atr_unavailable")
+        return (TradeSide.NEUTRAL, diagnostics) if debug else TradeSide.NEUTRAL
+
+    closes = [safe_get_num(b, "c") for b in setup_bars[-50:] if is_number(safe_get_num(b, "c"))]
+    regime_ref = np.median([simple_atr(setup_bars[-i - 14:-i]) or atr for i in range(1, 30) if len(setup_bars) > i + 14])
+    high_vol = atr > 1.2 * regime_ref if regime_ref else False
+    diagnostics["high_vol"] = high_vol
+    if high_vol:
+        diagnostics["steps"].append("high_volatility_regime_skip")
+        return (TradeSide.NEUTRAL, diagnostics) if debug else TradeSide.NEUTRAL
+
+    # --- Step 3: Adaptive SNR zones ---
+    # use ATR for zone width instead of percent
+    atr_zone_pct = atr / safe_get_num(setup_bars[-1], "c") if safe_get_num(setup_bars[-1], "c") else 0.003
+    zones = find_snr_zones(setup_bars, lookback=snr_lookback,
+                           zone_radius_pct=atr_zone_pct, merge_pct=0.001)
     diagnostics["zones_found"] = len(zones)
     current_price = last_price(trigger_bars)
     diagnostics["current_price"] = current_price
-    snr = nearest_snr_zone(zones, current_price, max_dist_pct=snr_zone_maxdist_pct) if current_price is not None else None
-    diagnostics["snr_nearby"] = bool(snr)
+    snr = nearest_snr_zone(zones, current_price, max_dist_pct=snr_zone_maxdist_pct) if current_price else None
     diagnostics["snr"] = snr
-
     if snr is None:
         diagnostics["steps"].append("no_snr_nearby")
-        if debug:
-            return TradeSide.NEUTRAL, diagnostics
-        return TradeSide.NEUTRAL
+        return (TradeSide.NEUTRAL, diagnostics) if debug else TradeSide.NEUTRAL
 
-    # --- Step 3: detect liquidity sweep on trigger frame (M15) ---
-    sweep = detect_liquidity_sweep(trigger_bars, prev_extreme_lookback=6)
+    # --- Step 4: Sweep + Rejection ---
+    sweep = detect_liquidity_sweep(trigger_bars, prev_extreme_lookback=8)
     diagnostics["sweep"] = sweep
-    if sweep is None:
+    if not sweep:
         diagnostics["steps"].append("no_sweep")
-        if debug:
-            return TradeSide.NEUTRAL, diagnostics
-        return TradeSide.NEUTRAL
+        return (TradeSide.NEUTRAL, diagnostics) if debug else TradeSide.NEUTRAL
 
-    # --- Step 4: confirmation candle rejection (compare last two trigger bars) ---
-    # ensure we have at least 2 trigger bars
     if len(trigger_bars) < 2:
-        diagnostics["steps"].append("insufficient_trigger_bars_for_confirmation")
-        if debug:
-            return TradeSide.NEUTRAL, diagnostics
-        return TradeSide.NEUTRAL
-
+        diagnostics["steps"].append("insufficient_trigger_bars")
+        return (TradeSide.NEUTRAL, diagnostics) if debug else TradeSide.NEUTRAL
     confirmed = candle_rejection(trigger_bars[-1], trigger_bars[-2])
     diagnostics["confirmed"] = confirmed
-    if not confirmed:
-        diagnostics["steps"].append("no_confirmation_rejection")
-        if debug:
-            return TradeSide.NEUTRAL, diagnostics
-        return TradeSide.NEUTRAL
 
-    # --- Step 5: Combine rules with bias & snr type ---
+    # --- Step 5: Weighted confirmation scoring ---
+    score = 0
+    if bias == "bullish":
+        score += 2
+    elif bias == "bearish":
+        score += 2
+    if snr.get("type") == "support" or snr.get("type") == "resistance":
+        score += 2
+    if sweep in ("bullish_sweep", "bearish_sweep"):
+        score += 3
+    if confirmed:
+        score += 3
+
+    diagnostics["score"] = score
+    if score < 7:
+        diagnostics["steps"].append("low_confidence_score")
+        return (TradeSide.NEUTRAL, diagnostics) if debug else TradeSide.NEUTRAL
+
+    # --- Step 6: Final decision ---
     result = TradeSide.NEUTRAL
     reason = None
-    # bullish case
-    if bias == "bullish" and snr.get("type") == "support" and sweep == "bullish_sweep":
-        result = TradeSide.LONG
-        reason = "bias_bullish + support + bullish_sweep + confirmed"
-    # bearish case
-    elif bias == "bearish" and snr.get("type") == "resistance" and sweep == "bearish_sweep":
-        result = TradeSide.SHORT
-        reason = "bias_bearish + resistance + bearish_sweep + confirmed"
+    if bias == "bullish" and snr.get("type") == "support" and sweep == "bullish_sweep" and confirmed:
+        result, reason = TradeSide.LONG, "strong bullish confluence"
+    elif bias == "bearish" and snr.get("type") == "resistance" and sweep == "bearish_sweep" and confirmed:
+        result, reason = TradeSide.SHORT, "strong bearish confluence"
     else:
-        diagnostics["steps"].append("rules_not_satisfied_for_bias_snr_sweep_combo")
+        diagnostics["steps"].append("combo_not_valid")
 
     diagnostics["result_reason"] = reason
     diagnostics["result"] = result
+    return (result, diagnostics) if debug else result
 
-    if debug:
-        return result, diagnostics
-    return result
 
 # === Optional: helper to produce trade params (stop/targets) ===
 def generate_risk_parameters(trigger_bars: List[Dict], side: TradeSide, atr_period=14, atr_mult=1.5):

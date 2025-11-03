@@ -85,7 +85,7 @@ class CapitalSocket:
             await self.websocket.send(json.dumps(subscribe_msg))
             if key not in self.subscribed_epics:
                 self.subscribed_epics.add(key)
-            await Logger.app_log(title="SUBSCRIBE_SENT", message=f"Subscribed to {epic} [{timeframe}]")
+            # await Logger.app_log(title="SUBSCRIBE_SENT", message=f"Subscribed to {epic} [{timeframe}]")
 
         except Exception as e:
             await Logger.app_log(title="SUBSCRIBE_ERR", message=f"{epic} [{timeframe}]: {str(e)}")
@@ -125,10 +125,11 @@ class CapitalSocket:
 
                     destination = data.get("destination")
                     if destination == "OHLCMarketData.subscribe":
-                        await Logger.app_log(
-                            title="SUBSCRIBE_CONFIRM",
-                            message=f"Subscription confirmed: {data['payload']['subscriptions']}"
-                        )
+                        # await Logger.app_log(
+                        #     title="SUBSCRIBE_CONFIRM",
+                        #     message=f"Subscription confirmed: {data['payload']['subscriptions']}"
+                        # )
+                        pass
                     elif destination == "OHLCMarketData.unsubscribe":
                         await Logger.app_log(
                             title="UNSUBSCRIBE_CONFIRM",

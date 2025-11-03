@@ -11,33 +11,32 @@ class CapitalSocketManager:
         self.sockets = []  # List of CapitalSocket instances
         self.subscription_map = defaultdict(list)  # epic -> list of timeframes
         self.socket_assignments = defaultdict(list)  # socket -> list of (epic, timeframe)
+        self.lock = asyncio.Lock()
 
     async def subscribe(self, epic: str, timeframe: str = "MINUTE"):
-        """Subscribe to an epic/timeframe, managing socket limits."""
-        # Check if already subscribed
         if timeframe in self.subscription_map[epic]:
             await Logger.app_log(title="SUBSCRIBE_SKIP", message=f"{epic} {timeframe} already subscribed")
             return
 
-        # Find a socket with available slots
-        socket = None
-        for s in self.sockets:
-            if len(self.socket_assignments[s]) < self.MAX_SUBSCRIPTIONS_PER_SOCKET:
-                socket = s
-                break
+        async with self.lock:
+            # critical section: select or create socket safely
+            socket = None
+            for s in self.sockets:
+                if len(self.socket_assignments[s]) < self.MAX_SUBSCRIPTIONS_PER_SOCKET:
+                    socket = s
+                    break
 
-        # If no socket available, create a new one
-        if socket is None:
-            socket = CapitalSocket()
-            self.sockets.append(socket)
-            await socket.connect_websocket()
+            if socket is None:
+                socket = CapitalSocket()
+                self.sockets.append(socket)
+                await socket.connect_websocket()
 
-        # Subscribe on the selected socket
+            # update internal maps *before* releasing lock to reserve slot
+            self.subscription_map[epic].append(timeframe)
+            self.socket_assignments[socket].append((epic, timeframe))
+
+        # now subscribe outside the lock — this part can safely run concurrently
         await socket.subscribe_to_epic(epic, timeframe)
-
-        # Update internal mappings
-        self.subscription_map[epic].append(timeframe)
-        self.socket_assignments[socket].append((epic, timeframe))
 
     async def unsubscribe(self, epic: str, timeframe: str = "MINUTE"):
         """Unsubscribe from an epic/timeframe."""
