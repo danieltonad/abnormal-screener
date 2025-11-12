@@ -24,9 +24,13 @@ def get_instrument_type(epic: str) -> EpicInstrument:
     forex_pairs = {
         "EURUSD", "USDJPY", "GBPUSD", "USDCAD", "AUDUSD",
         "USDCHF", "USDCNY", "USDMXN", "GBPAUD", "CADJPY",
-        "USDZAR", "USDTRY", "AUDJPY", "NZDJPY"
+        "USDZAR", "USDTRY", "AUDJPY", "NZDJPY", "NZDUSD"
     }
-    cryptos = {"BTCUSD", "ETHUSD", "BNBUSD", "SOLUSD"}
+    cryptos = {
+        "BTCUSD", "ETHUSD", "SOLUSD", "AVAXUSD", "DOGEUSD", "SHIBUSD",
+        "ADAUSD", "XRPUSD", "LTCUSD", "LINKUSD", "NEARUSD", "TONUSD",
+        "TAOUSD", "BCHUSD", "PEPEUSD", "AAVEUSD", "BNBUSD", "TRXUSD"
+    }
     indices = {"QQQ", "SPY", "IWM", "VOO", "US100", "US500", "US30"}
     commodities = {"GOLD", "SILVER", "OIL_CRUDE", "OIL_BRENT", "NATGAS"}
 

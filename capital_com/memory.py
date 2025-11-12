@@ -202,7 +202,8 @@ class Memory:
 
         except Exception as e:
             await Logger.app_log(title="PRELOAD_HISTORY_ERR", message=f"{epic}: {str(e)}")
-            return []
+            await asyncio.sleep(5)
+            return await self.preload_history(epic, resolution, n)
 
 
 

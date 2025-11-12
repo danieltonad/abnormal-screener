@@ -13,40 +13,34 @@ async def event_signal(ticker: str, timeframe: str):
         # calculate profit and loss levels
 
         if timeframe == "DAY":
-            side_mean_reversion = signal_mean_reversion(ticker, timeframe=timeframe)
-            side_atr_breakout = signal_atr_breakout(ticker, timeframe=timeframe)
-            side_smc = signal_smc(ticker, timeframe="HOUR_4")
-
             profit, loss = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=2, atr_mult=1)
-
+            side_atr_breakout = signal_atr_breakout(ticker, timeframe=timeframe)
             # ATR Breakout signals
-            if side_atr_breakout != TradeSide.NEUTRAL and side_atr_breakout != side_smc:
+            if side_atr_breakout != TradeSide.NEUTRAL:
                 await send_bulk_hook(tickers=[ticker], hook_name="ATR BRK OUT", direction=side_atr_breakout, amount=amount, profit=profit, loss=loss, mkt_closed=True)
+
+        elif timeframe == "HOUR_4":
+            side_mean_reversion = signal_mean_reversion(ticker, timeframe=timeframe)
+            profit, loss = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=3, atr_mult=1)
 
             # Mean Reversion signals
             if side_mean_reversion != TradeSide.NEUTRAL:
                 await send_bulk_hook(tickers=[ticker], hook_name="MEAN REV", direction=side_mean_reversion, amount=amount, profit=profit, loss=loss, mkt_closed=True)
         
-
-
-        
-        
-        elif timeframe == "HOUR_4":
-            side_smc = signal_smc(ticker, timeframe=timeframe)
             
-            profit, loss = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=2)
-
-
+        elif timeframe == "HOUR":
+            side_smc = signal_smc(ticker, timeframe=timeframe)
+            profit, loss = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=3, atr_mult=1)
             # SMC
             if side_smc != TradeSide.NEUTRAL:
                 await send_bulk_hook(tickers=[ticker], hook_name="SMC", direction=side_smc, amount=amount, profit=profit, loss=loss, mkt_closed=True)
         
 
 
-        elif timeframe == "MINUTE_30" and get_instrument_type(ticker) in [EpicInstrument.CRYPTO, EpicInstrument.INDICES, EpicInstrument.COMMODITIES]:
+        elif timeframe == "MINUTE_30" and get_instrument_type(ticker) != EpicInstrument.STOCKS:
             side_lit_snr = signal_lit_snr(ticker=ticker, trigger_tf=timeframe, bias_tf="DAY", setup_tf="HOUR_4")
 
-            profit, loss = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=4)
+            profit, loss = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=2 , atr_mult=3)
 
 
             # LIT SNR signals

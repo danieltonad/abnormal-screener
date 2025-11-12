@@ -64,24 +64,33 @@ class CapitalSocket:
             await asyncio.sleep(5)
             await self.ping_socket()
 
-    async def subscribe_to_epic(self, epic: str, timeframe: str = "MINUTE"):
+    async def subscribe_to_epic(self, epic: str, timeframe: str = "MINUTE", ohlc: bool = True):
         """Subscribe to real-time data for a given epic."""
         try:
             await self.connect_websocket()
             key = f"{epic}<=>{timeframe}"
 
-
-            subscribe_msg = {
-                "destination": "OHLCMarketData.subscribe",
-                "correlationId": f"epic_sub_{epic}_{timeframe}",
-                "cst": memory.capital_auth_header["CST"],
-                "securityToken": memory.capital_auth_header["X-SECURITY-TOKEN"],
-                "payload": {
-                    "epics": [epic],
-                    "resolutions": [timeframe],
-                    "type": "classic"
+            if ohlc:
+                subscribe_msg = {
+                    "destination": "OHLCMarketData.subscribe",
+                    "correlationId": f"epic_sub_{epic}_{timeframe}",
+                    "cst": memory.capital_auth_header["CST"],
+                    "securityToken": memory.capital_auth_header["X-SECURITY-TOKEN"],
+                    "payload": {
+                        "epics": [epic],
+                        "resolutions": [timeframe],
+                        "type": "classic"
+                    }
                 }
-            }
+            else:
+                subscribe_msg = {
+                    "destination": "marketData.subscribe",
+                    "correlationId": f"epic_sub_{epic}",
+                    "cst": memory.capital_auth_header["CST"],
+                    "securityToken": memory.capital_auth_header["X-SECURITY-TOKEN"],
+                    "payload": {"epics": [epic]}
+                    }
+
             await self.websocket.send(json.dumps(subscribe_msg))
             if key not in self.subscribed_epics:
                 self.subscribed_epics.add(key)
@@ -149,6 +158,15 @@ class CapitalSocket:
                         )
                         # Trigger event signal processing
                         await event_signal(payload["epic"], payload["resolution"])
+
+                    elif data["destination"] == "quote":
+                        payload = data["payload"]
+                        # memory.update_market_data(
+                        #     epic=payload["epic"],
+                        #     ask=payload["ofr"],
+                        #     bid=payload["bid"],
+                        #     timestamp=payload["timestamp"]
+                        # )
 
 
                 except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosedError) as e:
