@@ -97,28 +97,21 @@ def signal_smc(
     min_bars=200,
     atr_period=14,
     consolidation_lookback=20,
-    confirmation_required=2,
+    confirmation_required=1,   # <-- lower default for intraday
 ):
-    """
-    Returns LONG / SHORT / NEUTRAL based on SMC logic.
-    Uses bid bars only.
-    """
-    bars = [b for b in memory.get_history(ticker, timeframe, 200) if b["price_type"] == "bid"]
+    bars = [b for b in memory.get_history(ticker, timeframe, 400) if b["price_type"] == "bid"]
     if len(bars) < min_bars:
         return TradeSide.NEUTRAL
 
     df = pd.DataFrame(bars)[["t", "o", "h", "l", "c"]]
 
-    # ATR filter
     atr_val = atr_from_df(df, atr_period)
     if atr_val is None:
         return TradeSide.NEUTRAL
 
-    # Consolidation filter
     if is_consolidating(df, lookback=consolidation_lookback, range_pct_threshold=0.02):
         return TradeSide.NEUTRAL
 
-    # Core SMC detectors
     bos_signal = detect_break_of_structure(df, lookback_swing=20)
     ob = detect_order_block(df, 60)
     fvg = detect_fvg(df)
@@ -128,37 +121,52 @@ def signal_smc(
     price = float(last["c"])
     confirmations = 0
 
-    # Candle impulse
     candle_range = last["h"] - last["l"]
-    avg_range = df["h"].sub(df["l"]).rolling(50).mean().iloc[-1]
-    impulse_ok = candle_range > 1.02 * avg_range
+    avg_range = df["h"].sub(df["l"]).rolling(min(50, len(df))).mean().iloc[-1]
+    impulse_ok = candle_range > 1.02 * (avg_range if avg_range > 0 else 1e-8)
 
-    # --- Long logic ---
+    # normalize zones helper
+    def norm_zone(z):
+        if z is None:
+            return None
+        a, b = z
+        return (min(a, b), max(a, b))
+
     if bos_signal == TradeSide.LONG:
-        if ob and ob["side"] == "BULLISH_OB" and ob["zone"][0] <= price <= ob["zone"][1]:
-            confirmations += 1
-        if fvg and fvg["type"] == "BULL_FVG" and fvg["zone"][0] <= price <= fvg["zone"][1]:
-            confirmations += 1
-        if sweep and sweep["type"] == "LIQ_SWEEP_LONG":
+        if ob:
+            zone = norm_zone(ob["zone"])
+            if ob["side"] == "BULLISH_OB" and zone[0] <= price <= zone[1]:
+                confirmations += 1
+        if fvg and fvg["type"] == "BULL_FVG":
+            zone = norm_zone(fvg["zone"])
+            if zone[0] <= price <= zone[1]:
+                confirmations += 1
+        if sweep and sweep.get("type") == "LIQ_SWEEP_LONG":
             confirmations += 1
         lower_wick = min(last["c"], last["o"]) - last["l"]
         if impulse_ok and lower_wick > 0.5 * abs(last["c"] - last["o"]):
             confirmations += 1
-        if confirmations > confirmation_required:
+
+        # accept equal-to required confirmations (>=) for intraday speed
+        if confirmations >= confirmation_required:
             return TradeSide.LONG
 
-    # --- Short logic ---
     if bos_signal == TradeSide.SHORT:
-        if ob and ob["side"] == "BEARISH_OB" and ob["zone"][0] <= price <= ob["zone"][1]:
-            confirmations += 1
-        if fvg and fvg["type"] == "BEAR_FVG" and fvg["zone"][0] <= price <= fvg["zone"][1]:
-            confirmations += 1
-        if sweep and sweep["type"] == "LIQ_SWEEP_SHORT":
+        if ob:
+            zone = norm_zone(ob["zone"])
+            if ob["side"] == "BEARISH_OB" and zone[0] <= price <= zone[1]:
+                confirmations += 1
+        if fvg and fvg["type"] == "BEAR_FVG":
+            zone = norm_zone(fvg["zone"])
+            if zone[0] <= price <= zone[1]:
+                confirmations += 1
+        if sweep and sweep.get("type") == "LIQ_SWEEP_SHORT":
             confirmations += 1
         upper_wick = last["h"] - max(last["c"], last["o"])
         if impulse_ok and upper_wick > 0.5 * abs(last["c"] - last["o"]):
             confirmations += 1
-        if confirmations > confirmation_required:
+        if confirmations >= confirmation_required:
             return TradeSide.SHORT
 
     return TradeSide.NEUTRAL
+

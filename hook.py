@@ -3,7 +3,7 @@ from enums.trade import TradeSide
 import asyncio
 
 
-async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, session: AsyncClient, mkt_closed: bool = False, recalibrate: bool = True):
+async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, trail_sl: int, session: AsyncClient, mkt_closed: bool = False, recalibrate: bool = True):
     from settings import settings
     ticker = settings.ticker_mask(ticker)
     if ticker not in settings.watchlist:
@@ -18,6 +18,7 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
         "hook_name": hook_name,
         "profit": profit,
         "loss": loss,
+        "trail_sl": trail_sl,
         "exit_criteria": [
             "TP", "SL"
         ]
@@ -27,7 +28,7 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
     if recalibrate:
         payload["exit_criteria"].append("RECALIBRATE")
     res = await session.post(url, json=payload)
-    print(f"{hook_name} Hook | {ticker}: {res.status_code} -> {direction} | TP: ${profit} | SL: ${loss}")
+    print(f"{hook_name} Hook | {ticker}: {res.status_code} -> {direction} | TP: ${profit} | SL: ${loss} | Trail: ${trail_sl}")
 
 
 async def send_bulk_hook(tickers: list, hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, mkt_closed: bool = False):

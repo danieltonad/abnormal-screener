@@ -25,9 +25,9 @@ def signal_trend_following(
     last = bars[-1]
 
     high_range = max(highs[-breakout_period:])
-    low_range = min(lows[-breakout_period:])
-    exit_high = max(highs[-exit_period:])
-    exit_low = min(lows[-exit_period:])
+    low_range  = min(lows[-breakout_period:])
+    exit_high  = max(highs[-exit_period:])
+    exit_low   = min(lows[-exit_period:])
 
     # --- Breakout Up ---
     if last["c"] > high_range:
@@ -37,13 +37,13 @@ def signal_trend_following(
     if last["c"] < low_range:
         return TradeSide.SHORT
 
-    # --- Exit Conditions ---
-    if last["c"] < exit_low:
-        return TradeSide.SHORT
-    if last["c"] > exit_high:
-        return TradeSide.LONG
+    # --- Exit Conditions: go neutral, not flip ---
+    # If price crosses the exit band, we signal NEUTRAL (exit), not the opposite side.
+    if last["c"] < exit_low or last["c"] > exit_high:
+        return TradeSide.NEUTRAL
 
     return TradeSide.NEUTRAL
+
 
 
 
@@ -84,9 +84,9 @@ def signal_momentum(
 def signal_mean_reversion(
     ticker: str,
     timeframe="DAY",
-    rsi_period=14,          # ← changed from 2
-    base_oversold=30,       # ← changed from 10
-    base_overbought=70,     # ← changed from 90
+    rsi_period=14,
+    base_oversold=35,       # ← slightly higher, more frequent buy signals
+    base_overbought=65,     # ← slightly lower, more frequent sell signals
     ema_fast=20,
     ema_slow=50,
     vol_window=14,
@@ -113,25 +113,30 @@ def signal_mean_reversion(
     if None in (rsi_val, ema_fast_val, ema_slow_val, atr_val):
         return TradeSide.NEUTRAL
 
-    # --- Stronger trend filter ---
-    in_uptrend = ema_fast_val > ema_slow_val
-    in_downtrend = ema_fast_val < ema_slow_val
+    # --- Softer trend filter ---
+    # Instead of blocking trades *against* a trend, just reduce conviction.
+    in_uptrend = ema_fast_val > ema_slow_val * 1.01
+    in_downtrend = ema_fast_val < ema_slow_val * 0.99
 
-    # --- Volatility filter (keep your logic) ---
+    # --- Softer volatility filter ---
     avg_range = sum(b["h"] - b["l"] for b in bars[-vol_window:]) / vol_window
-    if atr_val > avg_range * 1.5:
+    if atr_val > avg_range * 2.0:   # ← allow more volatility before neutral
         return TradeSide.NEUTRAL
 
     # --- Mean Reversion Logic ---
-    # Only buy oversold if NOT in strong uptrend
-    if rsi_val < base_oversold and not in_uptrend:
+    # Allow countertrend trades, but within reason.
+    if rsi_val < base_oversold:
+        if in_downtrend:  # countertrend, but okay if mild
+            return TradeSide.LONG
         return TradeSide.LONG
 
-    # Only sell overbought if NOT in strong downtrend
-    if rsi_val > base_overbought and not in_downtrend:
+    if rsi_val > base_overbought:
+        if in_uptrend:
+            return TradeSide.SHORT
         return TradeSide.SHORT
 
     return TradeSide.NEUTRAL
+
 
 
 
@@ -219,41 +224,47 @@ def signal_atr_breakout(
     atr_mult=1.0,
     ema_period=50,
     swing_lookback=5,  # recent swing high/low window
+    use_vwap=False,
 ):
     bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
     min_required = max(atr_period, ema_period, swing_lookback) + 2
     if len(bars) < min_required:
         return TradeSide.NEUTRAL
 
-    # Extract price series
     closes = np.array([b["c"] for b in bars])
     highs = np.array([b["h"] for b in bars])
     lows = np.array([b["l"] for b in bars])
 
-    # ATR
     vol = atr_from_df(pd.DataFrame(bars), atr_period)
     if vol is None or vol == 0:
         return TradeSide.NEUTRAL
-    buffer = atr_mult * vol
 
-    # EMA trend filter
+    # make buffer slightly smaller for equities to be more reactive
+    buffer = atr_mult * vol * 0.8
+
     ema_vals = ema(closes, ema_period)
     current_price = closes[-1]
     current_ema = ema_vals[-1]
     trend_up = current_price > current_ema
     trend_down = current_price < current_ema
 
-    # Recent swing high/low (excluding current bar)
     recent_high = highs[-(swing_lookback+1):-1].max()
-    recent_low = lows[-(swing_lookback+1):-1].min()
+    recent_low  = lows[-(swing_lookback+1):-1].min()
 
     last_close = closes[-1]
 
-    # Long: breakout above swing high + buffer AND in uptrend
+    # Optional: if using VWAP as an additional filter, compute simple VWAP
+    if use_vwap and len(bars) >= 20 and "v" in bars[-1]:
+        # compute vwap on recent bars if volume available
+        vv = np.array([b.get("v", 0.0) for b in bars[-atr_period:]])
+        pv = np.array([b["c"] * b.get("v", 0.0) for b in bars[-atr_period:]])
+        vwap = pv.sum() / (vv.sum() + 1e-9)
+        if abs(last_close - vwap)/vwap > 0.05:  # if >5% away from vwap, be cautious
+            return TradeSide.NEUTRAL
+
     if last_close > recent_high + buffer and trend_up:
         return TradeSide.LONG
 
-    # Short: breakdown below swing low - buffer AND in downtrend
     if last_close < recent_low - buffer and trend_down:
         return TradeSide.SHORT
 
@@ -414,34 +425,58 @@ def get_levels(
     ticker: str,
     timeframe="DAY",
     atr_period=14,
-    atr_mult=2.0,     # for SL
-    rr=4.0,           # reward multiplier
+    atr_mult=2.0,    # stop-loss multiple of ATR
+    rr=2.0,          # reward multiple
     notional=1000.0
 ):
     """
-    Returns (SL$, TP$) tuple at chosen RR.
+    Returns (TP$, SL$, trail_range$)
+    Spread-aware: expands volatility when spreads widen.
+    Trail range adapts dynamically to volatility and spread context.
     """
-    bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
-    if len(bars) < atr_period + 1:
-        return 50, 50 # default
+    bids = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
+    asks = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "ask"]
 
-    entry = bars[-1]["c"]
+    if len(bids) < atr_period + 1 or len(asks) < atr_period + 1:
+        return 50, 50, 25
 
-    vol = atr(bars, atr_period)
+    entry = (bids[-1]["c"] + asks[-1]["c"]) / 2
+
+    vol = atr(bids, atr_period)
     if isinstance(vol, list):
         vol = vol[-1]
     if vol is None:
-        return 50, 50 # default
+        return 50, 50, 25
 
-    # price distances
-    sl_dist = atr_mult * vol
+    spreads = [a["c"] - b["c"] for a, b in zip(asks[-atr_period:], bids[-atr_period:])]
+    mids = [(a["c"] + b["c"]) / 2 for a, b in zip(asks[-atr_period:], bids[-atr_period:])]
+    spread_pcts = [s / m for s, m in zip(spreads, mids)]
+
+    current_spread_pct = spread_pcts[-1]
+    avg_spread_pct = sum(spread_pcts) / len(spread_pcts)
+    spread_ratio = current_spread_pct / max(avg_spread_pct, 1e-6)
+    dynamic_mult = min(1.0 + 0.5 * (spread_ratio - 1), 2.0) if spread_ratio > 1 else 1.0
+
+    adj_vol = vol * dynamic_mult
+
+    sl_dist = atr_mult * adj_vol
     tp_dist = sl_dist * rr
 
-    # convert to dollar PnL
-    sl_pnl = notional * (sl_dist / entry)  # min $20 SL
+    sl_pnl = notional * (sl_dist / entry)
     tp_pnl = notional * (tp_dist / entry)
 
-    return (int(tp_pnl), int(sl_pnl))
+    # --- SMART TRAIL RANGE ---
+    # Base trail = halfway between SL and TP in terms of distance
+    base_trail = (tp_dist - sl_dist) * 0.5
+
+    # Add spread influence: if spread_ratio > 1, widen trail proportionally
+    trail_adj = base_trail * (0.8 + 0.2 * min(spread_ratio, 3))  # mild widening up to +60%
+
+    trail_pnl = notional * (trail_adj / entry)
+
+    return int(tp_pnl), int(sl_pnl), int(trail_pnl)
+
+
 
 
 

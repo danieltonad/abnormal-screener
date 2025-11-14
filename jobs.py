@@ -27,14 +27,13 @@ class JobManager:
 
     
     async def subscribe_epic(epic, memory, capital_socket):
+        timeframes = ["MINUTE_30", "MINUTE_15", "HOUR", "HOUR_4", "DAY"]
         # preload history concurrently (these are REST calls, can overlap safely)
-        await memory.preload_history(epic, resolution="MINUTE_30", n=200)
-        await memory.preload_history(epic, resolution="HOUR", n=200)
-        await memory.preload_history(epic, resolution="HOUR_4", n=200)
-        await memory.preload_history(epic, resolution="DAY", n=200)
+        for timeframe in timeframes:
+            await memory.preload_history(epic, resolution=timeframe, n=400)
 
         # throttle socket subs — prevent flood disconnects
-        for timeframe in ["MINUTE_30", "HOUR", "HOUR_4", "DAY"]:
+        for timeframe in timeframes:
             try:
                 await capital_socket.subscribe(epic, timeframe=timeframe)
             except Exception as e:
@@ -45,7 +44,6 @@ class JobManager:
     async def subscribe_capital_list(settings, memory, capital_socket, max_concurrent=7):
 
         sem = asyncio.Semaphore(max_concurrent)
-
         async def worker(epic):
             async with sem:
                 try:
