@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from capital_com.signals import signal_ema_crossover
 from settings import settings
 from asyncio import sleep, create_task
 from enums.trade import TradeTimeFrame, TradeSide

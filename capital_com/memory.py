@@ -14,7 +14,7 @@ class Memory:
     ohlc_latest: Dict[Tuple[str, str], dict] = {}
 
     # Rolling store: (epic, resolution) -> deque of bars
-    ohlc_history: Dict[Tuple[str, str], Deque[dict]] = defaultdict(lambda: deque(maxlen=500))
+    ohlc_history: Dict[Tuple[str, str], Deque[dict]] = defaultdict(lambda: deque(maxlen=1_500))
 
 
     @staticmethod
@@ -64,10 +64,8 @@ class Memory:
 
     def update_ohlc_data(self, epic: str, resolution: str, timestamp: str, open: float, high: float, low: float, close: float, price_type: str):
         """Update OHLC data (latest + history) for an epic/resolution."""
-        if price_type.lower() != "bid":
-            return  # Ignore other price types for consistency
 
-        key = (epic, resolution)
+        key = (epic, resolution, price_type.lower())
         dq = self.ohlc_history[key]
 
         ts_obj = self._parse_ts(timestamp)
@@ -83,7 +81,7 @@ class Memory:
             "h": float(high),
             "l": float(low),
             "c": float(close),
-            "price_type": "bid",
+            "price_type": price_type.lower(),
         }
 
 
@@ -104,13 +102,10 @@ class Memory:
         # --- Update latest bar ---
         self.ohlc_latest[key] = bar
 
-    def get_latest(self, epic: str, resolution: str) -> dict:
-        """Get latest OHLC for an epic/resolution."""
-        return self.ohlc_latest.get((epic, resolution), {})
 
-    def get_history(self, epic: str, resolution: str, n: int = 100) -> list:
+    def get_history(self, epic: str,  resolution: str, price_type: str = "bid", n: int = 1_000) -> list:
         """Get last n bars (chronological) for an epic/resolution."""
-        bars = list(self.ohlc_history.get((epic, resolution), []))
+        bars = list(self.ohlc_history.get((epic, resolution, price_type.lower()), []))
         # safety sort (should already be ordered)
         bars.sort(key=lambda b: b["ts"])
         return bars[-n:]
@@ -145,7 +140,7 @@ class Memory:
 
 
 
-    async def preload_history(self, epic: str, resolution: str = "DAY", n: int = 100):
+    async def preload_history(self, epic: str, resolution: str = "DAY", n: int = 200):
         """
         Fetch last n OHLC bars from Capital.com REST API and store in history.
         Fully strict: chronological, deduped, bid-only, sets latest.
@@ -175,27 +170,28 @@ class Memory:
             prices.sort(key=lambda p: p["snapshotTimeUTC"])
 
             for p in prices:
-                # Defensive parsing — skip incomplete data
-                try:
-                    t = p["snapshotTimeUTC"]
-                    o = float(p["openPrice"]["bid"])
-                    h = float(p["highPrice"]["bid"])
-                    l = float(p["lowPrice"]["bid"])
-                    c = float(p["closePrice"]["bid"])
-                except (KeyError, TypeError, ValueError):
-                    continue
+                for _type in ["ask", "bid"]:
+                    # Defensive parsing — skip incomplete data
+                    try:
+                        t = p["snapshotTimeUTC"]
+                        o = float(p["openPrice"][_type])
+                        h = float(p["highPrice"][_type])
+                        l = float(p["lowPrice"][_type])
+                        c = float(p["closePrice"][_type])
+                    except (KeyError, TypeError, ValueError):
+                        continue
 
-                # Route through strict updater (keeps everything validated)
-                self.update_ohlc_data(
-                    epic=epic,
-                    resolution=resolution,
-                    timestamp=self.iso_to_unix_ms(t),
-                    open=o,
-                    high=h,
-                    low=l,
-                    close=c,
-                    price_type="bid",
-                )
+                    # Route through strict updater (keeps everything validated)
+                    self.update_ohlc_data(
+                        epic=epic,
+                        resolution=resolution,
+                        timestamp=self.iso_to_unix_ms(t),
+                        open=o,
+                        high=h,
+                        low=l,
+                        close=c,
+                        price_type=_type,
+                    )
 
             # Return clean chronological list
             # return self.get_history(epic, resolution, n)

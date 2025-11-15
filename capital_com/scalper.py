@@ -70,8 +70,8 @@ def smooth_series(x, alpha=0.2):
 
 def signal_scalper_robust(
     ticker: str,
-    timeframe="M1",
-    higher_tfs=("M5", "M15"),
+    timeframe="MINUTE",
+    higher_tfs=("MINUTE_5", "MINUTE_15"),
     min_history=150,
     base_fast=9,
     base_slow=34,

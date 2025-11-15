@@ -16,7 +16,7 @@ def signal_ema_crossover(
     atr_factor=0.7,
 ):
     try:
-        bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
+        bars = [b for b in memory.get_history(ticker, timeframe)]
 
         if len(bars) < max(slow, atr_period) + 1:
             return TradeSide.NEUTRAL
@@ -67,7 +67,7 @@ def signal_rejection(
     level_percentile=35,
     trend_period=20,
 ):
-    bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
+    bars = [b for b in memory.get_history(ticker, timeframe)]
 
     if len(bars) < max(lookback, trend_period):
         return TradeSide.NEUTRAL
@@ -117,7 +117,7 @@ def signal_breakout(
     body_factor=1.5,
     trend_period=50,
 ):
-    bars = [b for b in memory.get_history(ticker, timeframe) if b["price_type"] == "bid"]
+    bars = [b for b in memory.get_history(ticker, timeframe)]
 
     if len(bars) < max(range_period + 2, atr_period + 1, trend_period):
         return TradeSide.NEUTRAL

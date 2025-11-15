@@ -61,8 +61,6 @@ class CapitalSocket:
 
         except Exception as e:
             await Logger.app_log(title="PING_ERR", message=f"Ping failed: {str(e)}")
-            await asyncio.sleep(5)
-            await self.ping_socket()
 
     async def subscribe_to_epic(self, epic: str, timeframe: str = "MINUTE", ohlc: bool = True):
         """Subscribe to real-time data for a given epic."""
@@ -125,7 +123,7 @@ class CapitalSocket:
 
     async def _listen(self):
         """Listen for incoming WebSocket messages and handle reconnections."""
-        from .event import event_signal  # Avoid circular import
+        from .event import faster_event_signal, stocks_event_signal  # Avoid circular import
         try:
             while self.running and self.websocket:
                 try:
@@ -157,7 +155,8 @@ class CapitalSocket:
                             price_type=payload["priceType"]
                         )
                         # Trigger event signal processing
-                        await event_signal(payload["epic"], payload["resolution"])
+                        await stocks_event_signal(payload["epic"], payload["resolution"])
+                        await faster_event_signal(payload["epic"], payload["resolution"])
 
                     elif data["destination"] == "quote":
                         payload = data["payload"]

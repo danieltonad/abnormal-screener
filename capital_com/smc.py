@@ -99,7 +99,7 @@ def signal_smc(
     consolidation_lookback=20,
     confirmation_required=1,   # <-- lower default for intraday
 ):
-    bars = [b for b in memory.get_history(ticker, timeframe, 400) if b["price_type"] == "bid"]
+    bars = [b for b in memory.get_history(ticker, timeframe)]
     if len(bars) < min_bars:
         return TradeSide.NEUTRAL
 

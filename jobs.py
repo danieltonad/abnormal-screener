@@ -13,24 +13,24 @@ class JobManager:
         from settings import settings
         # Schedule periodic tasks
         scheduler.add_job(memory.update_auth_header, IntervalTrigger(minutes=7), id="update_auth_header")
-        # scheduler.add_job(capital_socket.ping_all, IntervalTrigger(minutes=5), id="ping_socket")
+        scheduler.add_job(capital_socket.ping_all, IntervalTrigger(minutes=5), id="ping_socket")
 
         await memory.update_auth_header()
 
         await JobManager.subscribe_capital_list(settings=settings, memory=memory, capital_socket=capital_socket, max_concurrent=5)
 
         for key, bars in memory.ohlc_history.items():
-            print(f"{key[0]} ({key[1]}): {len(bars)} bars")
+            print(f"{key[0]} ({key[1]} {key[2]}): {len(bars)} bars")
 
         scheduler.start()
 
 
     
     async def subscribe_epic(epic, memory, capital_socket):
-        timeframes = ["MINUTE_30", "MINUTE_15", "HOUR", "HOUR_4", "DAY"]
+        timeframes = ["MINUTE_5", "HOUR", "HOUR_4"]
         # preload history concurrently (these are REST calls, can overlap safely)
         for timeframe in timeframes:
-            await memory.preload_history(epic, resolution=timeframe, n=400)
+            await memory.preload_history(epic, resolution=timeframe, n=500)
 
         # throttle socket subs — prevent flood disconnects
         for timeframe in timeframes:
@@ -39,7 +39,6 @@ class JobManager:
             except Exception as e:
                 print(f"Socket subscription failed for {epic} {timeframe}: {e}")
             await asyncio.sleep(0.3)  # small delay per sub
-
     
     async def subscribe_capital_list(settings, memory, capital_socket, max_concurrent=7):
 

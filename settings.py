@@ -8,6 +8,7 @@ load_dotenv(override=True)
 class Settings:
 
     def __init__(self):
+        from smart_group import conjured_epic_list
         if not os.path.exists("watchlist.txt"):
             self.watchlist = set()
         
@@ -15,7 +16,9 @@ class Settings:
             self.watchlist = set(line.strip() for line in f if line.strip())
         
         with open("capital.txt", "r") as f:
-            self.capital_list = set(line.strip() for line in f if line.strip())
+            capital_list = set(line.strip() for line in f if line.strip())
+            self.capital_list = conjured_epic_list(list(capital_list), block_size=8)
+            print(self.capital_list)
 
         print(f"Watchlist loaded with {len(self.watchlist)} tickers.")
         print(f"Capital list loaded with {len(self.capital_list)} tickers.")
