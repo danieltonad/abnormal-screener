@@ -7,13 +7,16 @@ scheduler = AsyncIOScheduler()
 
 
 class JobManager:
+
     @staticmethod
     async def start():
         from capital_com.socket_manager import capital_socket, memory
         from settings import settings
         # Schedule periodic tasks
-        scheduler.add_job(memory.update_auth_header, IntervalTrigger(minutes=7), id="update_auth_header")
-        scheduler.add_job(capital_socket.ping_all, IntervalTrigger(minutes=5), id="ping_socket")
+        scheduler.add_job(memory.update_auth_header, IntervalTrigger(minutes=9), id="update_auth_header")
+        scheduler.add_job(capital_socket.ping_all, IntervalTrigger(minutes=7), id="ping_socket")
+        
+        scheduler.start()
 
         await memory.update_auth_header()
 
@@ -22,15 +25,14 @@ class JobManager:
         for key, bars in memory.ohlc_history.items():
             print(f"{key[0]} ({key[1]} {key[2]}): {len(bars)} bars")
 
-        scheduler.start()
 
 
     
     async def subscribe_epic(epic, memory, capital_socket):
-        timeframes = ["MINUTE_5", "HOUR", "HOUR_4"]
+        timeframes = ["MINUTE", "MINUTE_15", "HOUR", "HOUR_4"]
         # preload history concurrently (these are REST calls, can overlap safely)
         for timeframe in timeframes:
-            await memory.preload_history(epic, resolution=timeframe, n=500)
+            await memory.preload_history(epic, resolution=timeframe, n=300)
 
         # throttle socket subs — prevent flood disconnects
         for timeframe in timeframes:

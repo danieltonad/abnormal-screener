@@ -186,100 +186,6 @@ def signal_atr_breakout(
 
 
 
-def signal_unified(
-    ticker: str,
-    timeframe="DAY",
-    regime_lookback=20,
-    mr_rsi_period=2,
-    mr_oversold=10,
-    mr_overbought=90,
-    atr_period=20,
-    atr_mult=1.0,
-    swing_lookback=5,
-    ema_trend_period=50,
-):
-    bars = [b for b in memory.get_history(ticker, timeframe)]
-    if len(bars) < max(regime_lookback, atr_period, ema_trend_period) + 5:
-        return TradeSide.NEUTRAL
-
-    df = pd.DataFrame(bars)
-    closes = df["c"].values
-    highs  = df["h"].values
-    lows   = df["l"].values
-
-    # -------------------------
-    # 1. Regime Classification
-    # -------------------------
-    # Volatility compression → MR
-    # Volatility expansion   → ATR breakout
-    atr_vals = df["h"].sub(df["l"]).rolling(regime_lookback).mean()
-    curr_range = (df["h"].iloc[-1] - df["l"].iloc[-1])
-    avg_range  = atr_vals.iloc[-1] if not pd.isna(atr_vals.iloc[-1]) else None
-
-    if avg_range is None:
-        return TradeSide.NEUTRAL
-
-    # Simple but effective classifier
-    # low vol → MR mode
-    # high vol → Trend mode
-    is_low_vol = curr_range < 0.9 * avg_range
-    is_high_vol = curr_range > 1.2 * avg_range
-
-    # -------------------------
-    # 2. Mean Reversion Block
-    # -------------------------
-    if is_low_vol:
-        rsi_val = rsi(closes, mr_rsi_period)[-1]
-        sma100 = sma(closes, 100)[-1]
-        price = closes[-1]
-
-        # uptrend → only long oversold
-        if price > sma100 and rsi_val < mr_oversold:
-            return TradeSide.LONG
-
-        # downtrend → only short overbought
-        if price < sma100 and rsi_val > mr_overbought:
-            return TradeSide.SHORT
-
-        return TradeSide.NEUTRAL
-
-    # -------------------------
-    # 3. ATR Breakout Block
-    # -------------------------
-    if is_high_vol:
-        vol = atr_from_df(df, atr_period)
-        if vol is None or vol == 0:
-            return TradeSide.NEUTRAL
-
-        buffer = atr_mult * vol * 0.8
-
-        ema_val = ema(closes, ema_trend_period)[-1]
-        price = closes[-1]
-
-        trend_up = price > ema_val
-        trend_down = price < ema_val
-
-        recent_high = highs[-(swing_lookback+1):-1].max()
-        recent_low  = lows[-(swing_lookback+1):-1].min()
-
-        if price > recent_high + buffer and trend_up:
-            return TradeSide.LONG
-
-        if price < recent_low - buffer and trend_down:
-            return TradeSide.SHORT
-
-        return TradeSide.NEUTRAL
-
-    # -------------------------
-    # Neutral regime (transition)
-    # -------------------------
-    return TradeSide.NEUTRAL
-
-
-
-
-
-
 # Hybrid (Trend + Mean Reversion)
 def signal_hybrid(
     ticker: str,
@@ -323,28 +229,25 @@ def signal_hybrid(
 # Candlestick Pattern Based Signal
 def signal_candle_patterns(
     ticker: str,
-    timeframe="DAY",
-    sma_period=20
+    trigger_timeframe="HOUR",
+    confirmation_timeframe="DAY",
+    sma_period=20,
 ):
-    bars = [
-        b for b in memory.get_history(ticker, timeframe)
-        
-    ]
-
-    if len(bars) < sma_period + 3:
+    # --- Step 1: Trigger timeframe ---
+    trigger_bars = memory.get_history(ticker, trigger_timeframe)
+    if len(trigger_bars) < sma_period + 3:
         return TradeSide.NEUTRAL
 
-    closes = [b["c"] for b in bars]
-    opens  = [b["o"] for b in bars]
-    highs  = [b["h"] for b in bars]
-    lows   = [b["l"] for b in bars]
+    closes = [b["c"] for b in trigger_bars]
+    opens  = [b["o"] for b in trigger_bars]
+    highs  = [b["h"] for b in trigger_bars]
+    lows   = [b["l"] for b in trigger_bars]
 
-    ma = sma(closes, sma_period)
-    ma = ma[-1] if isinstance(ma, list) else ma
+    ma = sum(closes[-sma_period:]) / sma_period
 
-    last   = bars[-1]
-    prev1  = bars[-2]
-    prev2  = bars[-3]
+    last   = trigger_bars[-1]
+    prev1  = trigger_bars[-2]
+    prev2  = trigger_bars[-3]
 
     body     = abs(last["c"] - last["o"])
     avg_body = sum(abs(c - o) for c, o in zip(closes[-sma_period:], opens[-sma_period:])) / sma_period
@@ -352,72 +255,35 @@ def signal_candle_patterns(
     is_bull = last["c"] > last["o"]
     is_bear = last["c"] < last["o"]
 
-    # === Bullish Patterns ===
-    bull_engulf = (
-        is_bull
-        and last["c"] > prev1["o"]
-        and last["o"] < prev1["c"]
-        and last["c"] > prev1["c"]
-        and last["o"] <= prev1["o"]
-        and body > avg_body
-        and last["c"] < ma
+    # Detect candle patterns
+    bullish = (
+        (is_bull and last["c"] > prev1["o"] and last["o"] < prev1["c"] and body > avg_body and last["c"] < ma)  # simplified Bullish Engulf
+        or (is_bull and (last["h"]-last["l"]) > 3*body and (last["c"]-last["l"])/(last["h"]-last["l"])>0.6 and last["c"]<ma)  # Hammer
+    )
+    bearish = (
+        (is_bear and last["c"] < prev1["o"] and last["o"] > prev1["c"] and body > avg_body and last["c"] > ma)  # Bearish Engulf
+        or (is_bear and (last["h"]-last["l"])>3*body and (last["h"]-last["c"])/(last["h"]-last["l"])>0.6 and last["c"]>ma)  # Shooting Star
     )
 
-    hammer = (
-        is_bull
-        and (last["h"] - last["l"]) > 3.0 * body
-        and (last["c"] - last["l"]) / (0.001 + last["h"] - last["l"]) > 0.6
-        and body > avg_body
-        and last["c"] < ma
-    )
+    # --- Step 2: Confirmation timeframe ---
+    confirm_bars = memory.get_history(ticker, confirmation_timeframe)
+    if len(confirm_bars) < 3:
+        return TradeSide.NEUTRAL
 
-    morning_star = (
-        prev2["c"] < prev2["o"]
-        and abs(prev1["c"] - prev1["o"]) < avg_body
-        and is_bull
-        and last["c"] > (prev2["o"] + prev2["c"]) / 2
-        and last["c"] < ma
-    )
+    confirm_last = confirm_bars[-1]
+    confirm_prev = confirm_bars[-2]
 
-    bullish = bull_engulf or hammer or morning_star
+    # Simple confirmation: higher timeframe trend
+    confirm_trend_long = confirm_last["c"] > confirm_prev["c"]
+    confirm_trend_short = confirm_last["c"] < confirm_prev["c"]
 
-    # === Bearish Patterns ===
-    bear_engulf = (
-        is_bear
-        and last["c"] < prev1["o"]
-        and last["o"] > prev1["c"]
-        and last["c"] < prev1["c"]
-        and last["o"] >= prev1["o"]
-        and body > avg_body
-        and last["c"] > ma
-    )
-
-    shooting_star = (
-        is_bear
-        and (last["h"] - last["l"]) > 3.0 * body
-        and (last["h"] - last["c"]) / (0.001 + last["h"] - last["l"]) > 0.6
-        and body > avg_body
-        and last["c"] > ma
-    )
-
-    evening_star = (
-        prev2["c"] > prev2["o"]
-        and abs(prev1["c"] - prev1["o"]) < avg_body
-        and is_bear
-        and last["c"] < (prev2["o"] + prev2["c"]) / 2
-        and last["c"] > ma
-    )
-
-    bearish = bear_engulf or shooting_star or evening_star
-
-    # === Return trade side ===
-    if bullish:
+    # --- Step 3: Combine trigger + confirmation ---
+    if bullish and confirm_trend_long:
         return TradeSide.LONG
-    elif bearish:
+    elif bearish and confirm_trend_short:
         return TradeSide.SHORT
     else:
         return TradeSide.NEUTRAL
-
 
 
 
@@ -485,7 +351,7 @@ def get_levels(
     trail_pnl = notional * (trail_adj / entry)
     
     # print(f"{ticker} | TP: {int(tp_pnl)}, SL: {int(sl_pnl)}, Trail: {int(trail_pnl)}")
-    return int(tp_pnl), int(sl_pnl), int(trail_pnl)
+    return int(tp_pnl), int(sl_pnl), int(sl_pnl)
 
 
 

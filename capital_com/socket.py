@@ -13,10 +13,7 @@ class CapitalSocket:
         self.subscribed_epics = set()
         self._listen_task = None
         self._reconnect_lock = asyncio.Lock()
-        self._ping_interval = 50
         self.correlation_id = str(uuid4())
-
-    
 
     async def connect_websocket(self):
         """Connect to Capital.com WebSocket if not already connected."""
@@ -25,30 +22,41 @@ class CapitalSocket:
 
         try:
             uri = "wss://api-streaming-capital.backend-capital.com/connect"
-            self.websocket = await websockets.connect(
-                uri, ping_interval=60, ping_timeout=30
-            )
+
+            # IMPORTANT:
+            # No ping_interval, no ping_timeout → avoid transport ping failures.
+            self.websocket = await websockets.connect(uri)
+
             self.running = True
             await Logger.app_log(title="WS_CONNECT", message="WebSocket connected")
 
             if not self._listen_task or self._listen_task.done():
                 self._listen_task = asyncio.create_task(self._listen())
-            asyncio.create_task(self._ping_loop())
 
         except Exception as e:
             await Logger.app_log(title="WS_CONNECT_ERR", message=str(e))
             await self._schedule_reconnect()
 
-    async def _ping_loop(self):
-        """Periodically ping the WebSocket to keep connection alive."""
-        while self.running and self.websocket:
-            await asyncio.sleep(self._ping_interval)
-            await self.ping_socket()
+    def _is_socket_closed(self):
+        ws = self.websocket
+        if ws is None:
+            return True
+
+        if hasattr(ws, "closed"):
+            return ws.closed
+
+        if hasattr(ws, "closed_connection"):
+            return ws.closed_connection
+
+        return True
 
     async def ping_socket(self):
-        """Send ping message to WebSocket."""
+        """
+        Send JSON ping to Capital.com.
+        This is manually called (cron), not looped.
+        """
         try:
-            if not self.running or not self.websocket:
+            if not self.running or not self.websocket or self._is_socket_closed():
                 return
 
             ping_msg = {
@@ -57,6 +65,7 @@ class CapitalSocket:
                 "cst": memory.capital_auth_header["CST"],
                 "securityToken": memory.capital_auth_header["X-SECURITY-TOKEN"]
             }
+
             await self.websocket.send(json.dumps(ping_msg))
 
         except Exception as e:
@@ -87,17 +96,14 @@ class CapitalSocket:
                     "cst": memory.capital_auth_header["CST"],
                     "securityToken": memory.capital_auth_header["X-SECURITY-TOKEN"],
                     "payload": {"epics": [epic]}
-                    }
+                }
 
             await self.websocket.send(json.dumps(subscribe_msg))
-            if key not in self.subscribed_epics:
-                self.subscribed_epics.add(key)
-            # await Logger.app_log(title="SUBSCRIBE_SENT", message=f"Subscribed to {epic} [{timeframe}]")
+            self.subscribed_epics.add(key)
 
         except Exception as e:
             await Logger.app_log(title="SUBSCRIBE_ERR", message=f"{epic} [{timeframe}]: {str(e)}")
             await asyncio.sleep(5)
-            # Retry once
             if self.running:
                 await self.subscribe_to_epic(epic, timeframe)
 
@@ -122,8 +128,7 @@ class CapitalSocket:
             await Logger.app_log(title="UNSUBSCRIBE_ERR", message=f"{epic} [{timeframe}]: {str(e)}")
 
     async def _listen(self):
-        """Listen for incoming WebSocket messages and handle reconnections."""
-        from .event import faster_event_signal, stocks_event_signal  # Avoid circular import
+        from .event import faster_event_signal, stocks_event_signal
         try:
             while self.running and self.websocket:
                 try:
@@ -131,17 +136,13 @@ class CapitalSocket:
                     data = json.loads(message)
 
                     destination = data.get("destination")
-                    if destination == "OHLCMarketData.subscribe":
-                        # await Logger.app_log(
-                        #     title="SUBSCRIBE_CONFIRM",
-                        #     message=f"Subscription confirmed: {data['payload']['subscriptions']}"
-                        # )
-                        pass
-                    elif destination == "OHLCMarketData.unsubscribe":
+
+                    if destination == "OHLCMarketData.unsubscribe":
                         await Logger.app_log(
                             title="UNSUBSCRIBE_CONFIRM",
                             message=f"Unsubscription confirmed: {data['payload']['subscriptions']}"
                         )
+
                     elif destination == "ohlc.event":
                         payload = data["payload"]
                         memory.update_ohlc_data(
@@ -154,19 +155,9 @@ class CapitalSocket:
                             close=payload["c"],
                             price_type=payload["priceType"]
                         )
-                        # Trigger event signal processing
+
                         await stocks_event_signal(payload["epic"], payload["resolution"])
                         await faster_event_signal(payload["epic"], payload["resolution"])
-
-                    elif data["destination"] == "quote":
-                        payload = data["payload"]
-                        # memory.update_market_data(
-                        #     epic=payload["epic"],
-                        #     ask=payload["ofr"],
-                        #     bid=payload["bid"],
-                        #     timestamp=payload["timestamp"]
-                        # )
-
 
                 except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosedError) as e:
                     await Logger.app_log(title="WS_LISTEN_ERR", message=str(e))
@@ -178,16 +169,13 @@ class CapitalSocket:
         finally:
             await self._schedule_reconnect()
 
-    
-    
     async def _schedule_reconnect(self):
-        """Ensure only one reconnect happens at a time."""
+        """Reconnect safely."""
         async with self._reconnect_lock:
             if not self.running:
                 return
 
             await Logger.app_log(title="WS_RECONNECT", message="Reconnecting WebSocket...")
-            self.running = False
 
             if self.websocket:
                 try:
@@ -196,21 +184,22 @@ class CapitalSocket:
                     await Logger.app_log(title="WS_CLOSE_ERR", message=str(e))
                 self.websocket = None
 
-            # Exponential backoff
             delay = 1
             for attempt in range(5):
                 try:
                     await asyncio.sleep(delay)
                     await self.connect_websocket()
-                    
-                    # Resubscribe to all previous epics
+
+                    # Re-subscribe
                     for key in list(self.subscribed_epics):
-                        epic, timeframe = tuple(key.split("<=>"))
+                        epic, timeframe = key.split("<=>")
                         await self.subscribe_to_epic(epic, timeframe)
                         await asyncio.sleep(0.2)
+
                     return
                 except Exception as e:
                     await Logger.app_log(title="WS_RECONNECT_ERR", message=str(e))
                     delay *= 2
 
-            await Logger.app_log(title="WS_RECONNECT_FAIL", message="Failed to reconnect after multiple attempts.")
+            await Logger.app_log(title="WS_RECONNECT_FAIL",
+                                 message="Failed to reconnect after multiple attempts.")
