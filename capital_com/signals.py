@@ -11,15 +11,11 @@ def ema_crossover(
     timeframe="MINUTE",
     fast=5,
     slow=13,
-    atr_period=14,
-    lookback=50,
-    atr_factor=0.7,
-    slow_trend=300,   # added
+    slow_trend=300,
 ):
     try:
         bars = [b for b in memory.get_history(ticker, timeframe)]
-
-        if len(bars) < max(slow_trend, slow, atr_period) + 1:
+        if len(bars) < max(slow_trend, slow, fast) + 1:
             return TradeSide.NEUTRAL
 
         closes = [b["c"] for b in bars]
@@ -30,29 +26,14 @@ def ema_crossover(
         last_fast, prev_fast = fast_ema[-1], fast_ema[-2]
         last_slow, prev_slow = slow_ema[-1], slow_ema[-2]
 
-        # ---- 300 EMA trend filter ----
+        # Long-term trend filter
         trend_ema = ema(closes, slow_trend)
-        if isinstance(trend_ema, list) or isinstance(trend_ema, np.ndarray):
+        if isinstance(trend_ema, (list, np.ndarray)):
             trend_ema = trend_ema[-1]
 
-        # ATR ratios
-        atr_values = atr(bars, atr_period)
-        atr_ratios = [a / c for a, c in zip(atr_values, closes) if a]
-
-        if not atr_ratios:
-            return TradeSide.NEUTRAL
-
-        recent_ratios = atr_ratios[-lookback:]
-        mean_ratio = sum(recent_ratios) / len(recent_ratios)
-
-        # Volatility gating
-        if atr_ratios[-1] <= atr_factor * mean_ratio:
-            return TradeSide.NEUTRAL
-
-        # ---- Crossovers with structural trend filter ----
         # Bullish crossover
         if prev_fast < prev_slow and last_fast > last_slow:
-            if closes[-1] > trend_ema:     # must align with 300 EMA trend
+            if closes[-1] > trend_ema:
                 return TradeSide.LONG
 
         # Bearish crossover
@@ -61,9 +42,10 @@ def ema_crossover(
                 return TradeSide.SHORT
 
         return TradeSide.NEUTRAL
-    
+
     except Exception:
         return TradeSide.NEUTRAL
+
 
 
 
