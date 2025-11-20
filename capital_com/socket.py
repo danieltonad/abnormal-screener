@@ -156,7 +156,7 @@ class CapitalSocket:
                             price_type=payload["priceType"]
                         )
 
-                        await stocks_event_signal(payload["epic"], payload["resolution"])
+                        # await stocks_event_signal(payload["epic"], payload["resolution"])
                         await faster_event_signal(payload["epic"], payload["resolution"])
 
                 except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosedError) as e:

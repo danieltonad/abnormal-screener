@@ -63,7 +63,7 @@ async def faster_event_signal(ticker: str, timeframe: str):
 
 
             # core scalp
-            if get_instrument_type(ticker) in [EpicInstrument.INDICES, EpicInstrument.COMMODITIES] and is_trading_session():
+            if get_instrument_type(ticker) in [EpicInstrument.COMMODITIES] and is_trading_session():
                 # EMA Crossover signals
                 side_ema = ema_crossover(ticker=ticker, timeframe=timeframe, fast=10, slow=20, slow_trend=300)
                 if side_ema != TradeSide.NEUTRAL:
@@ -80,10 +80,11 @@ async def faster_event_signal(ticker: str, timeframe: str):
                     await send_hook(ticker=ticker, hook_name="SNR", direction=side_rejection, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
 
             
-            # LIT SNR signals
-            side_lit_snr = signal_lit_snr(ticker=ticker, trigger_tf=timeframe, bias_tf="HOUR", setup_tf="MINUTE_15")
-            if side_lit_snr != TradeSide.NEUTRAL:
-                await send_hook(ticker=ticker, hook_name="LIT SNR", direction=side_lit_snr, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
+            if get_instrument_type(ticker) != EpicInstrument.COMMODITIES:
+                # LIT SNR signals
+                side_lit_snr = signal_lit_snr(ticker=ticker, trigger_tf=timeframe, bias_tf="HOUR", setup_tf="MINUTE_15")
+                if side_lit_snr != TradeSide.NEUTRAL:
+                    await send_hook(ticker=ticker, hook_name="LIT SNR", direction=side_lit_snr, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
 
         await session.aclose()
 
