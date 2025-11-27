@@ -59,15 +59,15 @@ async def faster_event_signal(ticker: str, timeframe: str):
         amount = 50
 
         if timeframe == "MINUTE" and get_instrument_type(ticker) in [EpicInstrument.CRYPTO, EpicInstrument.INDICES, EpicInstrument.COMMODITIES, EpicInstrument.CURRENCIES]:
-            profit, loss, trail_sl = get_levels(ticker, timeframe="HOUR", notional=amount * get_leverage(ticker), rr=5)
+            profit, loss, trail_sl = get_levels(ticker, timeframe="MINUTE_30", notional=amount * get_leverage(ticker), rr=5)
 
 
             # core scalp
             if get_instrument_type(ticker) in [EpicInstrument.COMMODITIES] and is_trading_session():
                 # EMA Crossover signals
-                side_ema = ema_crossover(ticker=ticker, timeframe=timeframe, fast=10, slow=20, slow_trend=300)
-                if side_ema != TradeSide.NEUTRAL:
-                    await send_hook(ticker=ticker, hook_name="10/20/300", direction=side_ema, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
+                # side_ema = ema_crossover(ticker=ticker, timeframe=timeframe, fast=10, slow=20, slow_trend=300)
+                # if side_ema != TradeSide.NEUTRAL:
+                #     await send_hook(ticker=ticker, hook_name="10/20/300", direction=side_ema, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
 
                 # SNR Breakout signals
                 side_breakout = signal_breakout(ticker=ticker, timeframe=timeframe)
