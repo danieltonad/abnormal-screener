@@ -17,8 +17,9 @@ class CapitalSocket:
 
     async def connect_websocket(self):
         """Connect to Capital.com WebSocket if not already connected."""
-        if self.websocket and self.running:
-            return
+        # if self.websocket and self.running:
+        #     print("WebSocket already connected.")
+        #     return
 
         try:
             uri = "wss://api-streaming-capital.backend-capital.com/connect"
@@ -56,7 +57,8 @@ class CapitalSocket:
         This is manually called (cron), not looped.
         """
         try:
-            if not self.running or not self.websocket or self._is_socket_closed():
+            if not self.websocket:
+                print("WebSocket not connected, cannot ping.")
                 return
 
             ping_msg = {
@@ -132,7 +134,7 @@ class CapitalSocket:
         try:
             while self.running and self.websocket:
                 try:
-                    message = await asyncio.wait_for(self.websocket.recv(), timeout=300)
+                    message = await asyncio.wait_for(self.websocket.recv(),timeout=5000)
                     data = json.loads(message)
 
                     destination = data.get("destination")
@@ -169,10 +171,13 @@ class CapitalSocket:
         finally:
             await self._schedule_reconnect()
 
+    
+    
     async def _schedule_reconnect(self):
         """Reconnect safely."""
         async with self._reconnect_lock:
             if not self.running:
+                print("WebSocket not running, no reconnect needed.")
                 return
 
             await Logger.app_log(title="WS_RECONNECT", message="Reconnecting WebSocket...")

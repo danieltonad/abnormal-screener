@@ -13,8 +13,8 @@ class JobManager:
         from capital_com.socket_manager import capital_socket, memory
         from settings import settings
         # Schedule periodic tasks
-        scheduler.add_job(memory.update_auth_header, IntervalTrigger(minutes=9), id="update_auth_header")
-        scheduler.add_job(capital_socket.ping_all, IntervalTrigger(minutes=7), id="ping_socket")
+        scheduler.add_job(memory.update_auth_header, IntervalTrigger(minutes=5), id="update_auth_header")
+        scheduler.add_job(capital_socket.ping_all, IntervalTrigger(minutes=4), id="ping_socket")
         
         scheduler.start()
 
