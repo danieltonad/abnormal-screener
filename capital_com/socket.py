@@ -70,6 +70,8 @@ class CapitalSocket:
 
             await self.websocket.send(json.dumps(ping_msg))
 
+            print("WS_PING_SENT")
+
         except Exception as e:
             await Logger.app_log(title="PING_ERR", message=f"Ping failed: {str(e)}")
 
