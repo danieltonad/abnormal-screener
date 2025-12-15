@@ -138,6 +138,7 @@ class CapitalSocket:
                 try:
                     message = await asyncio.wait_for(self.websocket.recv(),timeout=5000)
                     data = json.loads(message)
+                    print(data)
 
                     destination = data.get("destination")
 

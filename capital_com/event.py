@@ -50,6 +50,7 @@ async def faster_event_signal(ticker: str, timeframe: str):
     from .signals import signal_breakout, signal_rejection, ema_crossover
     from capital_com.lit_snr import signal_lit_snr
     try:
+        print(f"Faster Event Signal Triggered: {ticker} | {timeframe}")
 
         # early exit stocks
         if get_instrument_type(ticker) == EpicInstrument.STOCKS:
@@ -63,21 +64,21 @@ async def faster_event_signal(ticker: str, timeframe: str):
 
 
             # core scalp
-            if get_instrument_type(ticker) in [EpicInstrument.COMMODITIES] and is_trading_session():
-                # EMA Crossover signals
-                side_ema = ema_crossover(ticker=ticker, timeframe=timeframe, fast=10, slow=20, slow_trend=300)
-                if side_ema != TradeSide.NEUTRAL:
-                    await send_hook(ticker=ticker, hook_name="10/20/300", direction=side_ema, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
+            # if get_instrument_type(ticker) in [EpicInstrument.COMMODITIES]:
+            #     # EMA Crossover signals
+            #     side_ema = ema_crossover(ticker=ticker, timeframe=timeframe, fast=10, slow=20, slow_trend=300)
+            #     if side_ema != TradeSide.NEUTRAL:
+            #         await send_hook(ticker=ticker, hook_name="10/20/300", direction=side_ema, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
 
-                # SNR Breakout signals
-                side_breakout = signal_breakout(ticker=ticker, timeframe=timeframe)
-                if side_breakout != TradeSide.NEUTRAL:
-                    await send_hook(ticker=ticker, hook_name="BRK OUT", direction=side_breakout, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
+            #     # SNR Breakout signals
+            #     side_breakout = signal_breakout(ticker=ticker, timeframe=timeframe)
+            #     if side_breakout != TradeSide.NEUTRAL:
+            #         await send_hook(ticker=ticker, hook_name="BRK OUT", direction=side_breakout, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
 
-                # SNR Breakout signals
-                side_rejection = signal_rejection(ticker=ticker, timeframe=timeframe)
-                if side_rejection != TradeSide.NEUTRAL:
-                    await send_hook(ticker=ticker, hook_name="SNR", direction=side_rejection, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
+            #     # SNR Breakout signals
+            #     side_rejection = signal_rejection(ticker=ticker, timeframe=timeframe)
+            #     if side_rejection != TradeSide.NEUTRAL:
+            #         await send_hook(ticker=ticker, hook_name="SNR", direction=side_rejection, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
 
             
             # if get_instrument_type(ticker) != EpicInstrument.COMMODITIES:
