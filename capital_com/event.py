@@ -7,6 +7,7 @@ def is_trading_session() -> bool:
     # Primary: London–NY overlap
     return time(12, 0) <= now <= time(16, 30)
 
+
 async def stocks_event_signal(ticker: str, timeframe: str):
     from enums.trade import TradeSide
     from hook import send_hook, AsyncClient
@@ -38,8 +39,6 @@ async def stocks_event_signal(ticker: str, timeframe: str):
     except Exception as e:
         print("STOCKS_SIGNAL_ERR:", str(e))
         await session.aclose()
-
-
 
 
 
