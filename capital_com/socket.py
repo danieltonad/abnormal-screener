@@ -132,7 +132,8 @@ class CapitalSocket:
             await Logger.app_log(title="UNSUBSCRIBE_ERR", message=f"{epic} [{timeframe}]: {str(e)}")
 
     async def _listen(self):
-        from .event import faster_event_signal, stocks_event_signal
+        from .event import faster_event_signal, mid_event_signal
+
         try:
             while self.running and self.websocket:
                 try:
@@ -161,7 +162,7 @@ class CapitalSocket:
                             price_type=payload["priceType"]
                         )
 
-                        # await stocks_event_signal(payload["epic"], payload["resolution"])
+                        # await mid_event_signal(payload["epic"], payload["resolution"])
                         await faster_event_signal(payload["epic"], payload["resolution"])
 
                 except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosedError) as e:
