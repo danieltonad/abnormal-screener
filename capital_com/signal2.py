@@ -139,6 +139,7 @@ def signal_mean_reversion(
 
 
 
+
 # Breakout + ATR Buffer
 def signal_atr_breakout(
     ticker: str,
@@ -288,11 +289,6 @@ def signal_candle_patterns(
 
 
 
-
-
-
-
-
 def get_levels(
     ticker: str,
     timeframe="DAY",
@@ -356,4 +352,91 @@ def get_levels(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ENTRY / EXIT SIGNALS BELOW
+
+
+
+def signal_atr_breakout_two_way(
+    ticker: str,
+    timeframe="DAY",
+    atr_period=20,
+    atr_mult=1.0,
+    ema_period=50,
+    swing_lookback=5,
+):
+    bars = [b for b in memory.get_history(ticker, timeframe)]
+    min_required = max(atr_period, ema_period, swing_lookback) + 2
+    if len(bars) < min_required:
+        return TradeSide.NEUTRAL
+
+    closes = np.array([b["c"] for b in bars])
+    highs  = np.array([b["h"] for b in bars])
+    lows   = np.array([b["l"] for b in bars])
+
+    vol = atr_from_df(pd.DataFrame(bars), atr_period)
+    if vol is None or vol == 0:
+        return TradeSide.NEUTRAL
+
+    buffer = atr_mult * vol * 0.8
+
+    ema_vals = ema(closes, ema_period)
+    current_price = closes[-1]
+    current_ema = ema_vals[-1]
+
+    trend_up   = current_price > current_ema
+    trend_down = current_price < current_ema
+
+    recent_high = highs[-(swing_lookback + 1):-1].max()
+    recent_low  = lows[-(swing_lookback + 1):-1].min()
+
+    last_close = closes[-1]
+
+    # --------------------
+    # EXIT LOGIC (STATELESS)
+    # --------------------
+
+    # Exit long if breakout failed or trend flipped
+    if last_close < recent_high - buffer and trend_down:
+        return TradeSide.EXIT_LONG
+
+    # Exit short if breakdown failed or trend flipped
+    if last_close > recent_low + buffer and trend_up:
+        return TradeSide.EXIT_SHORT
+
+    # --------------------
+    # ENTRY LOGIC
+    # --------------------
+
+    if last_close > recent_high + buffer and trend_up:
+        return TradeSide.LONG
+
+    if last_close < recent_low - buffer and trend_down:
+        return TradeSide.SHORT
+
+    return TradeSide.NEUTRAL
 

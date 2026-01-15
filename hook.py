@@ -8,12 +8,11 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
     ticker = settings.ticker_mask(ticker)
     if ticker not in settings.watchlist:
         return
-        
-    direction = "BUY" if direction == TradeSide.LONG else "SELL"
+    
     url = "http://127.0.0.1:3556/webhook/trading-view"
     payload = {
         "epic": ticker,
-        "direction": direction,
+        "direction": direction.value,
         "amount": amount,
         "hook_name": hook_name,
         "profit": profit,

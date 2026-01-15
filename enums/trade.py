@@ -1,17 +1,12 @@
 from enum import Enum
 
 class TradeSide(Enum):
-    LONG = "LONG"
-    SHORT = "SHORT"
+    LONG = "BUY"
+    SHORT = "SELL"
     NEUTRAL = "NEUTRAL"  
+    EXIT_LONG = "EXIT_BUY"
+    EXIT_SHORT = "EXIT_SELL"
     
-    def inverse(self):
-        if self == TradeSide.LONG:
-            return TradeSide.SHORT
-        elif self == TradeSide.SHORT:
-            return TradeSide.LONG
-        else:
-            return TradeSide.NEUTRAL
 
 class TradeTimeFrame(Enum):
     ONE_MIN = "1m"

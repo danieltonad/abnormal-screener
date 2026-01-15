@@ -1,122 +1,81 @@
-import websockets
 import asyncio
 import json
-from .memory import memory
-from logger import Logger
+import websockets
 from uuid import uuid4
+from logger import Logger
+from .memory import memory
 
 
 class CapitalSocket:
+    URI = "wss://api-streaming-capital.backend-capital.com/connect"
+
     def __init__(self):
         self.websocket = None
+        self.listener_task = None
+
         self.running = False
+        self.connected = False
+
         self.subscribed_epics = set()
-        self._listen_task = None
-        self._reconnect_lock = asyncio.Lock()
         self.correlation_id = str(uuid4())
 
+        self._connect_lock = asyncio.Lock()
+
+    # ───────────────────────────────
+    # Connection
+    # ───────────────────────────────
+
     async def connect_websocket(self):
-        """Connect to Capital.com WebSocket if not already connected."""
-        # if self.websocket and self.running:
-        #     print("WebSocket already connected.")
-        #     return
-
-        try:
-            uri = "wss://api-streaming-capital.backend-capital.com/connect"
-
-            # IMPORTANT:
-            # No ping_interval, no ping_timeout → avoid transport ping failures.
-            self.websocket = await websockets.connect(uri)
-
-            self.running = True
-            await Logger.app_log(title="WS_CONNECT", message="WebSocket connected")
-
-            if not self._listen_task or self._listen_task.done():
-                self._listen_task = asyncio.create_task(self._listen())
-
-        except Exception as e:
-            await Logger.app_log(title="WS_CONNECT_ERR", message=str(e))
-            await self._schedule_reconnect()
-
-    def _is_socket_closed(self):
-        ws = self.websocket
-        if ws is None:
-            return True
-
-        if hasattr(ws, "closed"):
-            return ws.closed
-
-        if hasattr(ws, "closed_connection"):
-            return ws.closed_connection
-
-        return True
-
-    async def ping_socket(self):
-        """
-        Send JSON ping to Capital.com.
-        This is manually called (cron), not looped.
-        """
-        try:
-            if not self.websocket:
-                print("WebSocket not connected, cannot ping.")
+        async with self._connect_lock:
+            if self.connected:
                 return
 
-            ping_msg = {
-                "destination": "ping",
-                "correlationId": f"SOCKET_{self.correlation_id}",
-                "cst": memory.capital_auth_header["CST"],
-                "securityToken": memory.capital_auth_header["X-SECURITY-TOKEN"]
-            }
+            try:
+                self.websocket = await websockets.connect(
+                    self.URI,
+                    ping_interval=None,   # Capital prefers app-level ping
+                    ping_timeout=None,
+                )
 
-            await self.websocket.send(json.dumps(ping_msg))
+                self.connected = True
+                self.running = True
 
-            print("WS_PING_SENT")
+                await Logger.app_log(
+                    title="WS_CONNECT",
+                    message="WebSocket transport connected"
+                )
 
-        except Exception as e:
-            await Logger.app_log(title="PING_ERR", message=f"Ping failed: {str(e)}")
+                self.listener_task = asyncio.create_task(self._listen())
 
-    async def subscribe_to_epic(self, epic: str, timeframe: str = "MINUTE", ohlc: bool = True):
-        """Subscribe to real-time data for a given epic."""
-        try:
-            await self.connect_websocket()
-            key = f"{epic}<=>{timeframe}"
+            except Exception as e:
+                await Logger.app_log(
+                    title="WS_CONNECT_ERR",
+                    message=str(e)
+                )
+                await self.close()
+                raise
 
-            if ohlc:
-                subscribe_msg = {
-                    "destination": "OHLCMarketData.subscribe",
-                    "correlationId": f"epic_sub_{epic}_{timeframe}",
-                    "cst": memory.capital_auth_header["CST"],
-                    "securityToken": memory.capital_auth_header["X-SECURITY-TOKEN"],
-                    "payload": {
-                        "epics": [epic],
-                        "resolutions": [timeframe],
-                        "type": "classic"
-                    }
-                }
-            else:
-                subscribe_msg = {
-                    "destination": "marketData.subscribe",
-                    "correlationId": f"epic_sub_{epic}",
-                    "cst": memory.capital_auth_header["CST"],
-                    "securityToken": memory.capital_auth_header["X-SECURITY-TOKEN"],
-                    "payload": {"epics": [epic]}
-                }
+    # ───────────────────────────────
+    # Subscriptions
+    # ───────────────────────────────
 
-            await self.websocket.send(json.dumps(subscribe_msg))
-            self.subscribed_epics.add(key)
+    async def subscribe_to_epic(
+        self,
+        epic: str,
+        timeframe: str = "MINUTE",
+        ohlc: bool = True
+    ):
+        if not self.connected:
+            raise RuntimeError("WebSocket not connected")
 
-        except Exception as e:
-            await Logger.app_log(title="SUBSCRIBE_ERR", message=f"{epic} [{timeframe}]: {str(e)}")
-            await asyncio.sleep(5)
-            if self.running:
-                await self.subscribe_to_epic(epic, timeframe)
+        key = f"{epic}<=>{timeframe}"
+        if key in self.subscribed_epics:
+            return
 
-    async def unsubscribe_from_epic(self, epic: str, timeframe: str = "MINUTE"):
-        """Unsubscribe from real-time data for a given epic."""
-        try:
-            unsubscribe_msg = {
-                "destination": "OHLCMarketData.unsubscribe",
-                "correlationId": f"epic_sub_{epic}_{timeframe}",
+        if ohlc:
+            msg = {
+                "destination": "OHLCMarketData.subscribe",
+                "correlationId": f"SUB_{epic}_{timeframe}_{uuid4()}",
                 "cst": memory.capital_auth_header["CST"],
                 "securityToken": memory.capital_auth_header["X-SECURITY-TOKEN"],
                 "payload": {
@@ -125,90 +84,144 @@ class CapitalSocket:
                     "type": "classic"
                 }
             }
-            await self.websocket.send(json.dumps(unsubscribe_msg))
-            await Logger.app_log(title="UNSUBSCRIBE_SENT", message=f"Unsubscribed from {epic} [{timeframe}]")
+        else:
+            msg = {
+                "destination": "marketData.subscribe",
+                "correlationId": f"SUB_{epic}_{uuid4()}",
+                "cst": memory.capital_auth_header["CST"],
+                "securityToken": memory.capital_auth_header["X-SECURITY-TOKEN"],
+                "payload": {
+                    "epics": [epic]
+                }
+            }
 
-        except Exception as e:
-            await Logger.app_log(title="UNSUBSCRIBE_ERR", message=f"{epic} [{timeframe}]: {str(e)}")
+        await self.websocket.send(json.dumps(msg))
+        self.subscribed_epics.add(key)
+
+        await Logger.app_log(
+            title="SUBSCRIBE_SENT",
+            message=f"{epic} [{timeframe}]"
+        )
+
+    async def unsubscribe_from_epic(self, epic: str, timeframe: str = "MINUTE"):
+        if not self.connected:
+            return
+
+        key = f"{epic}<=>{timeframe}"
+        if key not in self.subscribed_epics:
+            return
+
+        msg = {
+            "destination": "OHLCMarketData.unsubscribe",
+            "correlationId": f"UNSUB_{epic}_{timeframe}_{uuid4()}",
+            "cst": memory.capital_auth_header["CST"],
+            "securityToken": memory.capital_auth_header["X-SECURITY-TOKEN"],
+            "payload": {
+                "epics": [epic],
+                "resolutions": [timeframe],
+                "type": "classic"
+            }
+        }
+
+        await self.websocket.send(json.dumps(msg))
+        self.subscribed_epics.remove(key)
+
+        await Logger.app_log(
+            title="UNSUBSCRIBE_SENT",
+            message=f"{epic} [{timeframe}]"
+        )
+
+    # ───────────────────────────────
+    # Listener
+    # ───────────────────────────────
 
     async def _listen(self):
-        from .event import faster_event_signal, mid_event_signal
+        from .event import faster_event_signal
 
         try:
-            while self.running and self.websocket:
-                try:
-                    message = await asyncio.wait_for(self.websocket.recv(),timeout=300)
-                    data = json.loads(message)
-                    print(data)
+            while self.running:
+                raw = await self.websocket.recv()
 
-                    destination = data.get("destination")
+                # log raw payloads when debugging weirdness
+                data = json.loads(raw)
+                destination = data.get("destination")
 
-                    if destination == "OHLCMarketData.unsubscribe":
-                        await Logger.app_log(
-                            title="UNSUBSCRIBE_CONFIRM",
-                            message=f"Unsubscription confirmed: {data['payload']['subscriptions']}"
-                        )
+                if data.get("status") == "ERROR":
+                    await Logger.app_log(
+                        title="WS_ERROR",
+                        message=json.dumps(data)
+                    )
+                    continue
 
-                    elif destination == "ohlc.event":
-                        payload = data["payload"]
-                        memory.update_ohlc_data(
-                            epic=payload["epic"],
-                            resolution=payload["resolution"],
-                            timestamp=payload["t"],
-                            open=payload["o"],
-                            high=payload["h"],
-                            low=payload["l"],
-                            close=payload["c"],
-                            price_type=payload["priceType"]
-                        )
-                        print(f"OHLC Update: {payload['epic']} | {payload['resolution']} | {payload['t']}")
-                        # await mid_event_signal(payload["epic"], payload["resolution"])
-                        await faster_event_signal(payload["epic"], payload["resolution"])
+                if destination == "ohlc.event":
+                    p = data["payload"]
 
-                except (asyncio.TimeoutError, websockets.exceptions.ConnectionClosedError) as e:
-                    await Logger.app_log(title="WS_LISTEN_ERR", message=str(e))
-                    break
+                    memory.update_ohlc_data(
+                        epic=p["epic"],
+                        resolution=p["resolution"],
+                        timestamp=p["t"],
+                        open=p["o"],
+                        high=p["h"],
+                        low=p["l"],
+                        close=p["c"],
+                        price_type=p["priceType"],
+                    )
+
+                    await faster_event_signal(
+                        p["epic"],
+                        p["resolution"]
+                    )
+
+                # else:
+                #     await Logger.app_log(
+                #         title="WS_EVENT",
+                #         message=json.dumps(data)
+                #     )
+
+        except websockets.exceptions.ConnectionClosed:
+            await Logger.app_log(
+                title="WS_CLOSED",
+                message="WebSocket closed by server"
+            )
 
         except Exception as e:
-            await Logger.app_log(title="WS_LISTEN_ERR", message=f"Unhandled: {str(e)}")
+            await Logger.app_log(
+                title="WS_LISTEN_ERR",
+                message=str(e)
+            )
 
         finally:
-            await self._schedule_reconnect()
+            self.running = False
+            self.connected = False
 
-    
-    
-    async def _schedule_reconnect(self):
-        """Reconnect safely."""
-        async with self._reconnect_lock:
-            if not self.running:
-                print("WebSocket not running, no reconnect needed.")
-                return
+    # ───────────────────────────────
+    # Ping & close
+    # ───────────────────────────────
 
-            await Logger.app_log(title="WS_RECONNECT", message="Reconnecting WebSocket...")
+    async def ping_socket(self):
+        if not self.connected:
+            return
 
-            if self.websocket:
-                try:
-                    await self.websocket.close()
-                except Exception as e:
-                    await Logger.app_log(title="WS_CLOSE_ERR", message=str(e))
-                self.websocket = None
+        msg = {
+            "destination": "ping",
+            "correlationId": f"PING_{self.correlation_id}",
+            "cst": memory.capital_auth_header["CST"],
+            "securityToken": memory.capital_auth_header["X-SECURITY-TOKEN"],
+        }
 
-            delay = 1
-            for attempt in range(5):
-                try:
-                    await asyncio.sleep(delay)
-                    await self.connect_websocket()
+        await self.websocket.send(json.dumps(msg))
 
-                    # Re-subscribe
-                    for key in list(self.subscribed_epics):
-                        epic, timeframe = key.split("<=>")
-                        await self.subscribe_to_epic(epic, timeframe)
-                        await asyncio.sleep(0.2)
+    async def close(self):
+        self.running = False
 
-                    return
-                except Exception as e:
-                    await Logger.app_log(title="WS_RECONNECT_ERR", message=str(e))
-                    delay *= 2
+        if self.listener_task:
+            self.listener_task.cancel()
 
-            await Logger.app_log(title="WS_RECONNECT_FAIL",
-                                 message="Failed to reconnect after multiple attempts.")
+        if self.websocket:
+            try:
+                await self.websocket.close()
+            except:
+                pass
+
+        self.websocket = None
+        self.connected = False

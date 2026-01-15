@@ -45,19 +45,20 @@ async def mid_event_signal(ticker: str, timeframe: str):
 async def faster_event_signal(ticker: str, timeframe: str):
     from hook import send_hook, AsyncClient
     from leverage import get_leverage, get_instrument_type, EpicInstrument
-    from capital_com.signal2 import get_levels, TradeSide, signal_trend_following
+    from capital_com.signal2 import get_levels, TradeSide, signal_atr_breakout_two_way
     try:
-        print(f"Faster Event Signal Triggered: {ticker} | {timeframe}")
+        # print(f"Faster Event Signal Triggered: {ticker} | {timeframe}")
+        if timeframe not in ["MINUTE_15", "MINUTE_30", "HOUR"]:
+            # print("Faster Event Signal: Unsupported timeframe ->", timeframe)
+            return
 
         session = AsyncClient()
         amount = 50
         profit, loss, trail_sl = 500, 500, 100
 
-        if timeframe not in ["MINUTE_15"]:
-            return
 
 
-        side_trend = signal_trend_following(ticker=ticker, timeframe=timeframe)
+        side_trend = signal_atr_breakout_two_way(ticker=ticker, timeframe=timeframe)
         if side_trend != TradeSide.NEUTRAL:
             await send_hook(ticker=ticker, hook_name=f"{timeframe}", direction=side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
 
