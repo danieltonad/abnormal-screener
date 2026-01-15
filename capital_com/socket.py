@@ -137,7 +137,7 @@ class CapitalSocket:
         try:
             while self.running and self.websocket:
                 try:
-                    message = await asyncio.wait_for(self.websocket.recv(),timeout=5000)
+                    message = await asyncio.wait_for(self.websocket.recv(),timeout=300)
                     data = json.loads(message)
                     print(data)
 
@@ -161,7 +161,7 @@ class CapitalSocket:
                             close=payload["c"],
                             price_type=payload["priceType"]
                         )
-
+                        print(f"OHLC Update: {payload['epic']} | {payload['resolution']} | {payload['t']}")
                         # await mid_event_signal(payload["epic"], payload["resolution"])
                         await faster_event_signal(payload["epic"], payload["resolution"])
 

@@ -14,7 +14,7 @@ class JobManager:
         from settings import settings
         # Schedule periodic tasks
         scheduler.add_job(memory.update_auth_header, IntervalTrigger(minutes=5), id="update_auth_header")
-        scheduler.add_job(capital_socket.ping_all, IntervalTrigger(minutes=4), id="ping_socket")
+        scheduler.add_job(capital_socket.ping_all, IntervalTrigger(minutes=5), id="ping_socket")
         
         scheduler.start()
 
@@ -29,7 +29,7 @@ class JobManager:
 
     
     async def subscribe_epic(epic, memory, capital_socket):
-        timeframes = [ "MINUTE_15", "MINUTE_30"]
+        timeframes = [ "MINUTE","MINUTE_15", "MINUTE_30"]
         # preload history concurrently (these are REST calls, can overlap safely)
         for timeframe in timeframes:
             await memory.preload_history(epic, resolution=timeframe, n=300)

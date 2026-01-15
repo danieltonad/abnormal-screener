@@ -123,7 +123,7 @@ class Memory:
                 'Content-Type': 'application/json'
             }
             async with AsyncClient() as session:
-                response = await session.post(f"https://api-capital.backend-capital.com/api/v1/session", headers=headers, data=payload)
+                response = await session.post(f"https://demo-api-capital.backend-capital.com/api/v1/session", headers=headers, data=payload)
             # print(response.status_code ,response.json())
             header: dict = response.headers
             CST = header.get("CST")
@@ -134,7 +134,7 @@ class Memory:
             
         except Exception as e:
             await Logger.app_log(title="UPDATE_AUTH_HEADER_ERR", message=str(e))
-            await asyncio.sleep(100)
+            await asyncio.sleep(10)
             return await self.update_auth_header()
 
 
