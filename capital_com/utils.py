@@ -1,5 +1,6 @@
 import numpy as np
 from collections import defaultdict
+import pandas as pd
 from datetime import datetime
 
 last_signal_time = defaultdict(lambda: None)  # cooldown memory
@@ -64,6 +65,31 @@ def atr_from_df(df, period=14):
     tr = np.maximum(high - low,
             np.maximum(abs(high - close.shift(1)), abs(low - close.shift(1))))
     return tr.rolling(window=period, min_periods=1).mean().iloc[-1]
+
+
+
+def atr_from_df_v2(df, period=20, smooth=3):
+    """
+    df: DataFrame with 'h', 'l', 'c'
+    period: ATR lookback
+    smooth: EMA smoothing factor for CFD feed quirks
+    """
+    highs = df['h'].values
+    lows  = df['l'].values
+    closes = df['c'].values
+    
+    tr = np.maximum(highs - lows, np.maximum(np.abs(highs - np.roll(closes, 1)), np.abs(lows - np.roll(closes, 1))))
+    tr[0] = highs[0] - lows[0]  # first candle
+    
+    # Standard ATR (rolling mean)
+    atr = pd.Series(tr).rolling(period).mean()
+    
+    # Smooth ATR to reduce CFD noise
+    if smooth > 1:
+        atr = atr.ewm(span=smooth, adjust=False).mean()
+    
+    return atr.values[-1] if len(atr) > 0 else None
+
 
 
 def check_cooldown(ticker, now, cooldown=5):

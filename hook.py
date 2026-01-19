@@ -1,7 +1,17 @@
 from httpx import AsyncClient
 from enums.trade import TradeSide
 import asyncio
+from datetime import datetime
 
+
+class Colors:
+    RESET = "\033[0m"
+    GREEN = "\033[32m"
+    CYAN = "\033[36m"
+    BLUE = "\033[34m"
+    GRAY = "\033[90m"
+    RED = "\033[91m"
+    YELLOW = "\033[93m"
 
 async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, trail_sl: int, session: AsyncClient, mkt_closed: bool = False, recalibrate: bool = True, strategy: bool = False):
     from settings import settings
@@ -29,7 +39,18 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
     if strategy:
         payload["exit_criteria"].append("STRATEGY")
     res = await session.post(url, json=payload)
-    print(f"{hook_name} Hook | {ticker}: {res.status_code} -> {direction} | TP: ${profit} | SL: ${loss} | Trail: ${trail_sl}")
+    time = datetime.now().strftime("%I:%M:%S %p")
+    if direction == TradeSide.LONG:
+        direction = f"{Colors.GREEN}{direction.value}{Colors.RESET}"
+    elif direction == TradeSide.SHORT:
+        direction = f"{Colors.RED}{direction.value}{Colors.RESET}"
+    elif direction == TradeSide.EXIT_LONG:
+        direction = f"{Colors.CYAN}{direction.value}{Colors.RESET}"
+    elif direction == TradeSide.EXIT_SHORT:
+        direction = f"{Colors.YELLOW}{direction.value}{Colors.RESET}"
+        
+    
+    print(f"[{time}]: {hook_name} Hook | {ticker}: {res.status_code} -> {direction}")
 
 
 async def send_bulk_hook(tickers: list, hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, mkt_closed: bool = False):

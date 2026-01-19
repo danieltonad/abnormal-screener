@@ -103,6 +103,8 @@ class CapitalSocketManager:
 
         # create new socket
         socket = CapitalSocket()
+        # tell socket how to report death
+        socket.on_close = self._handle_socket_close
         await socket.connect_websocket()
 
         self.sockets.append(socket)
@@ -154,6 +156,22 @@ class CapitalSocketManager:
             if (epic, timeframe) in subs:
                 return s
         return None
+    
+
+    async def _handle_socket_close(self, socket: CapitalSocket):
+        """
+        Called by CapitalSocket when the server closes the connection.
+        """
+        await Logger.app_log(
+            title="SOCKET_DEAD",
+            message="Socket reported closed, rebuilding"
+        )
+
+        await self._force_close(socket)
+
+        # rebuild subscriptions automatically
+        # await self.rebuild_all()
+
 
 
 
@@ -162,3 +180,4 @@ class CapitalSocketManager:
 capital_socket = CapitalSocketManager()
 
 
+# [16-01-2026 18:01:00] WS_CLOSED => WebSocket closed by server

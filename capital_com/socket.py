@@ -12,6 +12,7 @@ class CapitalSocket:
     def __init__(self):
         self.websocket = None
         self.listener_task = None
+        self.on_close = None
 
         self.running = False
         self.connected = False
@@ -177,6 +178,9 @@ class CapitalSocket:
                 #         title="WS_EVENT",
                 #         message=json.dumps(data)
                 #     )
+        
+        except asyncio.CancelledError:
+            pass
 
         except websockets.exceptions.ConnectionClosed:
             await Logger.app_log(
@@ -193,6 +197,9 @@ class CapitalSocket:
         finally:
             self.running = False
             self.connected = False
+
+            if self.on_close:
+                await self.on_close(self)
 
     # ───────────────────────────────
     # Ping & close

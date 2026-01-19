@@ -133,8 +133,8 @@ class Memory:
             # print("Capital.com Auth Header Updated")
             
         except Exception as e:
-            await Logger.app_log(title="UPDATE_AUTH_HEADER_ERR", message=str(e))
-            await asyncio.sleep(10)
+            # await Logger.app_log(title="UPDATE_AUTH_HEADER_ERR", message=str(e))
+            await asyncio.sleep(5)
             return await self.update_auth_header()
 
 

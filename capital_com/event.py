@@ -12,27 +12,11 @@ async def mid_event_signal(ticker: str, timeframe: str):
     from enums.trade import TradeSide
     from hook import send_hook, AsyncClient
     try:
-        from capital_com.signal2 import  get_levels, signal_candle_patterns
-        from capital_com.smc import signal_smc
+        from capital_com.signal2 import  signal_atr_breakout_exit
         from leverage import get_leverage, get_instrument_type, EpicInstrument
         
         amount = 50
         session = AsyncClient()
-
-        if timeframe == "HOUR" and get_instrument_type(ticker) == EpicInstrument.STOCKS:
-            
-            profit, loss, trail_sl = get_levels(ticker, timeframe=timeframe, notional=amount * get_leverage(ticker), rr=5)
-            
-            side_smc = signal_smc(ticker, timeframe=timeframe, confirmation_required=2)
-            side_candle = signal_candle_patterns(ticker, trigger_timeframe="HOUR", confirmation_timeframe="DAY")
-
-            # SMC
-            if side_smc != TradeSide.NEUTRAL:
-                await send_hook(ticker=ticker, hook_name="SMC", direction=side_smc, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session)   
-
-            if side_candle != TradeSide.NEUTRAL:
-                await send_hook(ticker=ticker, hook_name="CANDLE", direction=side_candle, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session)
-
 
         await session.aclose()
 
@@ -45,7 +29,7 @@ async def mid_event_signal(ticker: str, timeframe: str):
 async def faster_event_signal(ticker: str, timeframe: str):
     from hook import send_hook, AsyncClient
     from leverage import get_leverage, get_instrument_type, EpicInstrument
-    from capital_com.signal2 import get_levels, TradeSide, signal_atr_breakout_two_way
+    from capital_com.signal2 import TradeSide, signal_atr_breakout_exit, signal_atr_hilo_breakout
     try:
         # print(f"Faster Event Signal Triggered: {ticker} | {timeframe}")
         if timeframe not in ["MINUTE_15", "MINUTE_30", "HOUR"]:
@@ -54,13 +38,24 @@ async def faster_event_signal(ticker: str, timeframe: str):
 
         session = AsyncClient()
         amount = 50
-        profit, loss, trail_sl = 500, 500, 100
+        profit, loss, trail_sl = 500, 500, 50
 
 
 
-        side_trend = signal_atr_breakout_two_way(ticker=ticker, timeframe=timeframe)
+        side_trend = signal_atr_breakout_exit(ticker=ticker, timeframe=timeframe)
         if side_trend != TradeSide.NEUTRAL:
-            await send_hook(ticker=ticker, hook_name=f"{timeframe}", direction=side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
+            if timeframe == "MINUTE_15":
+                hook_name = "ATR_15"
+            elif timeframe == "MINUTE_30":
+                hook_name = "ATR_30"
+            await send_hook(ticker=ticker, hook_name=hook_name, direction=side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
+
+
+
+        # if timeframe == "HOUR":
+        #     side_trend = signal_atr_hilo_breakout(ticker=ticker, timeframe=timeframe, ema_period=21, atr_period=14, atr_mult=1, swing_lookback=10)
+        #     if side_trend != TradeSide.NEUTRAL:
+        #         await send_hook(ticker=ticker, hook_name=f"HI_LO", direction=side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
 
         await session.aclose()
 
