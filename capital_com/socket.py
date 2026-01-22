@@ -97,7 +97,8 @@ class CapitalSocket:
             }
 
         await self.websocket.send(json.dumps(msg))
-        self.subscribed_epics.add(key)
+        if ohlc:
+            self.subscribed_epics.add(key)
 
         await Logger.app_log(
             title="SUBSCRIBE_SENT",
@@ -200,6 +201,8 @@ class CapitalSocket:
 
             if self.on_close:
                 await self.on_close(self)
+            
+            await self.reconnect()
 
     # ───────────────────────────────
     # Ping & close
@@ -232,3 +235,12 @@ class CapitalSocket:
 
         self.websocket = None
         self.connected = False
+
+
+    async def reconnect(self):
+        await self.close()
+        epics = list(self.subscribed_epics)
+        self.subscribed_epics.clear()
+        for conn in epics:
+            epic, timeframe = conn.split("<=>")
+            await self.subscribe_to_epic(epic, timeframe)

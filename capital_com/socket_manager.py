@@ -17,7 +17,7 @@ class CapitalSocketManager:
     # Public API
     # ───────────────────────────────
 
-    async def subscribe(self, epic: str, timeframe: str = "MINUTE"):
+    async def subscribe(self, epic: str, timeframe: str, ohlc: bool = True):
         async with self.lock:
             if timeframe in self.subscription_map[epic]:
                 await Logger.app_log(
@@ -32,7 +32,7 @@ class CapitalSocketManager:
             self.socket_assignments[socket].add((epic, timeframe))
 
         # I/O outside lock
-        await socket.subscribe_to_epic(epic, timeframe)
+        await socket.subscribe_to_epic(epic, timeframe, ohlc=ohlc)
 
     async def unsubscribe(self, epic: str, timeframe: str = "MINUTE"):
         async with self.lock:

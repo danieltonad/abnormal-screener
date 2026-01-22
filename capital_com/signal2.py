@@ -57,15 +57,6 @@ def signal_atr_breakout(
 
 
 
-
-
-
-
-
-
-
-
-
 # ATR Breakout exit
 
 def signal_atr_breakout_exit(

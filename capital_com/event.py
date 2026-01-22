@@ -32,30 +32,26 @@ async def faster_event_signal(ticker: str, timeframe: str):
     from capital_com.signal2 import TradeSide, signal_atr_breakout_exit, signal_atr_hilo_breakout
     try:
         # print(f"Faster Event Signal Triggered: {ticker} | {timeframe}")
-        if timeframe not in ["MINUTE_15", "MINUTE_30", "HOUR"]:
+        if timeframe not in ["MINUTE_30", "HOUR"]:
             # print("Faster Event Signal: Unsupported timeframe ->", timeframe)
             return
 
         session = AsyncClient()
         amount = 50
-        profit, loss, trail_sl = 500, 500, 50
+        profit, loss, trail_sl = 500, 500, amount/2
 
 
 
         side_trend = signal_atr_breakout_exit(ticker=ticker, timeframe=timeframe)
         if side_trend != TradeSide.NEUTRAL:
-            if timeframe == "MINUTE_15":
-                hook_name = "ATR_15"
-            elif timeframe == "MINUTE_30":
-                hook_name = "ATR_30"
-            await send_hook(ticker=ticker, hook_name=hook_name, direction=side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
+            await send_hook(ticker=ticker, hook_name="ATR_30", direction=side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
 
 
 
-        # if timeframe == "HOUR":
-        #     side_trend = signal_atr_hilo_breakout(ticker=ticker, timeframe=timeframe, ema_period=21, atr_period=14, atr_mult=1, swing_lookback=10)
-        #     if side_trend != TradeSide.NEUTRAL:
-        #         await send_hook(ticker=ticker, hook_name=f"HI_LO", direction=side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
+        if timeframe == "HOUR":
+            side_trend = signal_atr_hilo_breakout(ticker=ticker, timeframe=timeframe, ema_period=21, atr_period=14, atr_mult=1, swing_lookback=10)
+            if side_trend != TradeSide.NEUTRAL:
+                await send_hook(ticker=ticker, hook_name=f"HI_LO", direction=side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
 
         await session.aclose()
 

@@ -29,7 +29,7 @@ class JobManager:
 
     
     async def subscribe_epic(epic, memory, capital_socket):
-        timeframes = [ "MINUTE","MINUTE_15", "MINUTE_30"]
+        timeframes = ["MINUTE_30", "HOUR"]
         # preload history concurrently (these are REST calls, can overlap safely)
         for timeframe in timeframes:
             await memory.preload_history(epic, resolution=timeframe, n=300)
@@ -43,7 +43,9 @@ class JobManager:
             await asyncio.sleep(0.3)  # small delay per sub
     
     async def subscribe_capital_list(settings, memory, capital_socket, max_concurrent=7):
-
+        await capital_socket.subscribe("BTCUSD", timeframe="MKT_DATA", ohlc=False)
+        await capital_socket.subscribe("GOLD", timeframe="MKT_DATA_GOLD", ohlc=False)
+        await capital_socket.subscribe("NFLX", timeframe="MKT_DATA_GOLD", ohlc=False)
         sem = asyncio.Semaphore(max_concurrent)
         async def worker(epic):
             async with sem:
