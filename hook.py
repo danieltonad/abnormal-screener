@@ -1,6 +1,6 @@
 from httpx import AsyncClient
 from enums.trade import TradeSide
-import asyncio
+import asyncio, random
 from datetime import datetime
 
 
@@ -57,4 +57,4 @@ async def send_bulk_hook(tickers: list, hook_name: str, direction: TradeSide, am
     async with AsyncClient() as session:
         for ticker in tickers:
             await send_hook(ticker, hook_name, direction, amount, profit, loss, session, mkt_closed)
-            await asyncio.sleep(0.2)
+            await asyncio.sleep(random.uniform(0.1, 2.0))
