@@ -29,7 +29,7 @@ class JobManager:
 
     
     async def subscribe_epic(epic, memory, capital_socket):
-        timeframes = ["MINUTE_15", "MINUTE_30", "HOUR"]
+        timeframes = ["MINUTE_15", "MINUTE_30","HOUR"]
         # preload history concurrently (these are REST calls, can overlap safely)
         for timeframe in timeframes:
             await memory.preload_history(epic, resolution=timeframe, n=300)

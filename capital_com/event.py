@@ -31,26 +31,26 @@ async def faster_event_signal(ticker: str, timeframe: str):
     from leverage import get_leverage, get_instrument_type, EpicInstrument
     from capital_com.signal2 import TradeSide, signal_atr_breakout_exit, signal_atr_hilo_breakout, signal_atr_momentum
     try:
-        if timeframe not in ["MINUTE_15", "MINUTE_30", "HOUR"]:
-            return
 
         session = AsyncClient()
 
 
-        if ticker == "MINUTE_30":
+        if timeframe == "MINUTE_30":
             amount = 50
             profit, loss, trail_sl = amount*2, amount, amount/2
-            # regime = signal_atr_hilo_breakout(ticker=ticker, timeframe="HOUR", ema_period=21, atr_period=14, atr_mult=1, swing_lookback=10)
+            regime = signal_atr_hilo_breakout(ticker=ticker, timeframe="HOUR", ema_period=21, atr_period=14, atr_mult=1, swing_lookback=10)
             atr_side_trend = signal_atr_breakout_exit(ticker=ticker, timeframe=timeframe)
-            if atr_side_trend != TradeSide.NEUTRAL:
+            # print(f"TREND_SIGNAL {ticker} {timeframe}: {atr_side_trend}")
+            if atr_side_trend != TradeSide.NEUTRAL and atr_side_trend == regime:
                 await send_hook(ticker=ticker, hook_name="TREND", direction=atr_side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
 
         
-        if ticker == "MINUTE_15":
+        if timeframe == "MINUTE_15":
             amount = 25
             profit, loss, trail_sl = amount*2, amount, amount/2
             regime = signal_atr_breakout_exit(ticker=ticker, timeframe="MINUTE_30")
             mommentum_trend = signal_atr_momentum(ticker=ticker, timeframe=timeframe)
+            # print(f"MOMM_SIGNAL {ticker} {timeframe}: {mommentum_trend} -> regime: {regime}")
             if mommentum_trend != TradeSide.NEUTRAL and mommentum_trend == regime:
                 await send_hook(ticker=ticker, hook_name="MOMENTUM", direction=mommentum_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
 
