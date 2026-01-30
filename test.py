@@ -1,7 +1,6 @@
 import asyncio
 from enums.trade import TradeTimeFrame, TradeSide
 
-
 async def test_play():
     # from screeners.etfs.ema import double_ema_list
     from screeners.crypto.ema import double_ema_list
@@ -24,19 +23,18 @@ async def test_play():
 
 
 async def socket_test():
-    from capital_com.socket import CapitalSocket, memory, Logger
-    from capital_com.signals import signal_ema_crossover, signal_rejection, signal_breakout 
-    from capital_com.smc import signal_smc
+    from capital_com.socket import  memory
+    from hook import send_hook, AsyncClient
 
-    await memory.update_auth_header()
+    # await memory.update_auth_header()
     
 
-    from capital_com.socket_manager import capital_socket
+    # from capital_com.socket_manager import capital_socket
 
     # await capital_socket.subscribe("US100", "MINUTE")
 
-    await memory.preload_history("US100", resolution="MINUTE", n=5)
-    print(memory.get_history(epic="US100", resolution="MINUTE"), end="\n\n\n")
+    # await memory.preload_history("US100", resolution="MINUTE", n=5)
+    # print(memory.get_history(epic="US100", resolution="MINUTE"), end="\n\n\n")
 
 
     # while True:
@@ -44,7 +42,11 @@ async def socket_test():
 
     #     print(memory.get_history(epic="US100", resolution="MINUTE"), end="\n\n\n")
     #     await capital_socket.ping_all()
+    session = AsyncClient()
+    await send_hook(ticker="US30", hook_name="TEST SOCKET", direction=TradeSide.EXIT_LONG, amount=50, profit=25/2, loss=10, trail_sl=5, session=session)
+    await session.aclose()
 
+    print(25//2)
 
 
 

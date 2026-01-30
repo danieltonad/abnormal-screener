@@ -38,6 +38,7 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
         payload["exit_criteria"].append("RECALIBRATE")
     if strategy:
         payload["exit_criteria"].append("STRATEGY")
+    await asyncio.sleep(random.uniform(0.1, 2.0))
     res = await session.post(url, json=payload)
     time = datetime.now().strftime("%I:%M:%S %p")
     if direction == TradeSide.LONG:
