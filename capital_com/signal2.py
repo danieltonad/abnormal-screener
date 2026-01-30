@@ -8,55 +8,6 @@ from datetime import datetime
 
 
 
-# Breakout + ATR Buffer
-def signal_atr_breakout(
-    ticker: str,
-    timeframe="DAY",
-    atr_period=20,
-    atr_mult=1.0,
-    ema_period=50,
-    swing_lookback=5,  # recent swing high/low window
-):
-    bars = [b for b in memory.get_history(ticker, timeframe) ]
-    min_required = max(atr_period, ema_period, swing_lookback) + 2
-    if len(bars) < min_required:
-        return TradeSide.NEUTRAL
-
-    closes = np.array([b["c"] for b in bars])
-    highs = np.array([b["h"] for b in bars])
-    lows = np.array([b["l"] for b in bars])
-
-    vol = atr_from_df(pd.DataFrame(bars), atr_period)
-    if vol is None or vol == 0:
-        return TradeSide.NEUTRAL
-
-    # make buffer slightly smaller for equities to be more reactive
-    buffer = atr_mult * atr_from_df_v2(pd.DataFrame(bars), atr_period)
-
-
-    ema_vals = ema(closes, ema_period)
-    current_price = closes[-1]
-    current_ema = ema_vals[-1]
-    trend_up = current_price > current_ema
-    trend_down = current_price < current_ema
-
-    recent_high = highs[-(swing_lookback+1):-1].max()
-    recent_low  = lows[-(swing_lookback+1):-1].min()
-
-    last_close = closes[-1]
-
-    if last_close > recent_high + buffer and trend_up:
-        return TradeSide.LONG
-
-    if last_close < recent_low - buffer and trend_down:
-        return TradeSide.SHORT
-
-    return TradeSide.NEUTRAL
-
-
-
-
-
 # ATR Breakout exit
 
 def signal_atr_breakout_exit(
@@ -237,6 +188,84 @@ def signal_atr_hilo_breakout(
 
     if recent_direction == TradeSide.SHORT:
         if last_close > current_ema + exit_buffer:
+            return TradeSide.EXIT_SHORT
+
+    return TradeSide.NEUTRAL
+
+
+
+
+
+
+
+
+
+
+
+
+
+def signal_atr_momentum(
+    ticker: str,
+    timeframe="HOUR",
+    atr_period=14,
+    roc_period=5,
+    roc_atr_thresh=1.5,
+    range_atr_mult=1.0,
+    stall_bars=3,
+):
+    bars = [b for b in memory.get_history(ticker, timeframe)]
+    min_required = max(atr_period, roc_period) + stall_bars + 5
+    if len(bars) < min_required:
+        return TradeSide.NEUTRAL
+
+    df = pd.DataFrame(bars)
+    closes = df["c"].values
+    highs  = df["h"].values
+    lows   = df["l"].values
+
+    # ---- ATR ----
+    atr = atr_from_df_v2(df, atr_period)
+    if atr is None or atr == 0 or np.isnan(atr):
+        return TradeSide.NEUTRAL
+
+    last_close = closes[-1]
+    prev_close = closes[-(roc_period + 1)]
+
+    # ---- Vol-adjusted momentum ----
+    roc_atr = (last_close - prev_close) / atr
+
+    # ---- Expansion candle ----
+    bar_range = highs[-1] - lows[-1]
+    expansion = bar_range > range_atr_mult * atr
+
+    # ---- Directional close ----
+    close_pos = (last_close - lows[-1]) / max(bar_range, 1e-6)
+
+    # ---- ENTRY ----
+    if roc_atr > roc_atr_thresh and expansion and close_pos > 0.7:
+        return TradeSide.LONG
+
+    if roc_atr < -roc_atr_thresh and expansion and close_pos < 0.3:
+        return TradeSide.SHORT
+
+    # ---- INFER RECENT MOMENTUM DIRECTION ----
+    recent_dir = None
+    for i in range(-stall_bars - 1, -1):
+        roc_i = (closes[i] - closes[i - roc_period]) / atr
+        if roc_i > roc_atr_thresh:
+            recent_dir = TradeSide.LONG
+            break
+        if roc_i < -roc_atr_thresh:
+            recent_dir = TradeSide.SHORT
+            break
+
+    # ---- EXIT: momentum decay ----
+    if recent_dir == TradeSide.LONG:
+        if roc_atr < 0.5:
+            return TradeSide.EXIT_LONG
+
+    if recent_dir == TradeSide.SHORT:
+        if roc_atr > -0.5:
             return TradeSide.EXIT_SHORT
 
     return TradeSide.NEUTRAL

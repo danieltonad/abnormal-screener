@@ -29,29 +29,32 @@ async def mid_event_signal(ticker: str, timeframe: str):
 async def faster_event_signal(ticker: str, timeframe: str):
     from hook import send_hook, AsyncClient
     from leverage import get_leverage, get_instrument_type, EpicInstrument
-    from capital_com.signal2 import TradeSide, signal_atr_breakout_exit, signal_atr_hilo_breakout
+    from capital_com.signal2 import TradeSide, signal_atr_breakout_exit, signal_atr_hilo_breakout, signal_atr_momentum
     try:
-        # print(f"Faster Event Signal Triggered: {ticker} | {timeframe}")
-        if timeframe not in ["MINUTE_30", "HOUR"]:
-            # print("Faster Event Signal: Unsupported timeframe ->", timeframe)
+        if timeframe not in ["MINUTE_15", "MINUTE_30", "HOUR"]:
             return
 
         session = AsyncClient()
-        amount = 50
-        profit, loss, trail_sl = 500, 500, amount/2
 
 
+        if ticker == "MINUTE_30":
+            amount = 50
+            profit, loss, trail_sl = amount*2, amount, amount/2
+            # regime = signal_atr_hilo_breakout(ticker=ticker, timeframe="HOUR", ema_period=21, atr_period=14, atr_mult=1, swing_lookback=10)
+            atr_side_trend = signal_atr_breakout_exit(ticker=ticker, timeframe=timeframe)
+            if atr_side_trend != TradeSide.NEUTRAL:
+                await send_hook(ticker=ticker, hook_name="TREND", direction=atr_side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
 
-        side_trend = signal_atr_breakout_exit(ticker=ticker, timeframe=timeframe)
-        if side_trend != TradeSide.NEUTRAL:
-            await send_hook(ticker=ticker, hook_name="ATR_30", direction=side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
+        
+        if ticker == "MINUTE_15":
+            amount = 25
+            profit, loss, trail_sl = amount*2, amount, amount/2
+            regime = signal_atr_breakout_exit(ticker=ticker, timeframe="MINUTE_30")
+            mommentum_trend = signal_atr_momentum(ticker=ticker, timeframe=timeframe)
+            if mommentum_trend != TradeSide.NEUTRAL and mommentum_trend == regime:
+                await send_hook(ticker=ticker, hook_name="MOMENTUM", direction=mommentum_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
 
 
-
-        if timeframe == "HOUR":
-            side_trend = signal_atr_hilo_breakout(ticker=ticker, timeframe=timeframe, ema_period=21, atr_period=14, atr_mult=1, swing_lookback=10)
-            if side_trend != TradeSide.NEUTRAL:
-                await send_hook(ticker=ticker, hook_name=f"HI_LO", direction=side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
 
         await session.aclose()
 
