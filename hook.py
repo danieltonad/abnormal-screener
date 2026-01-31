@@ -23,11 +23,11 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
     payload = {
         "epic": ticker,
         "direction": direction.value,
-        "amount": amount,
+        "amount": int(amount),
         "hook_name": hook_name,
-        "profit": profit,
-        "loss": loss,
-        "trail_sl": trail_sl,
+        "profit": int(profit),
+        "loss": int(loss),
+        "trail_sl": int(trail_sl),
         "exit_criteria": [
             "SL"
         ]
@@ -57,5 +57,5 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
 async def send_bulk_hook(tickers: list, hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, mkt_closed: bool = False):
     async with AsyncClient() as session:
         for ticker in tickers:
-            await send_hook(ticker, hook_name, direction, amount, profit, loss, session, mkt_closed)
+            await send_hook(ticker, hook_name, direction, int(amount), int(profit), int(loss), session, mkt_closed)
             await asyncio.sleep(random.uniform(0.1, 2.0))
