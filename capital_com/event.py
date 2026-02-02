@@ -36,7 +36,7 @@ async def faster_event_signal(ticker: str, timeframe: str):
 
 
         if timeframe == "MINUTE_30":
-            amount = 50
+            amount = 5
             profit, loss, trail_sl = amount*2, amount, amount//2
             # regime = signal_atr_hilo_breakout(ticker=ticker, timeframe="HOUR", ema_period=21, atr_period=14, atr_mult=1, swing_lookback=10)
             atr_side_trend = signal_atr_breakout_exit(ticker=ticker, timeframe=timeframe)
@@ -46,7 +46,7 @@ async def faster_event_signal(ticker: str, timeframe: str):
 
         
         if timeframe == "MINUTE_15":
-            amount = 25
+            amount = 3
             profit, loss, trail_sl = amount*2, amount, amount//2
             # regime = signal_atr_breakout_exit(ticker=ticker, timeframe="MINUTE_30")
             mommentum_trend = signal_atr_momentum(ticker=ticker, timeframe=timeframe)
