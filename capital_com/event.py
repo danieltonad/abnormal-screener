@@ -37,7 +37,7 @@ async def faster_event_signal(ticker: str, timeframe: str):
 
         if timeframe == "MINUTE_30":
             amount = 5
-            profit, loss, trail_sl = amount*2, amount, amount//2
+            profit, loss, trail_sl = amount*2, amount*2, amount//2
             # regime = signal_atr_hilo_breakout(ticker=ticker, timeframe="HOUR", ema_period=21, atr_period=14, atr_mult=1, swing_lookback=10)
             atr_side_trend = signal_atr_breakout_exit(ticker=ticker, timeframe=timeframe)
             # print(f"TREND_SIGNAL {ticker} {timeframe}: {atr_side_trend.value} -> regime: {regime.value}")
@@ -47,10 +47,9 @@ async def faster_event_signal(ticker: str, timeframe: str):
         
         if timeframe == "MINUTE_15":
             amount = 3
-            profit, loss, trail_sl = amount*2, amount, amount//2
+            profit, loss, trail_sl = amount*2, amount*2, amount//2
             # regime = signal_atr_breakout_exit(ticker=ticker, timeframe="MINUTE_30")
             mommentum_trend = signal_atr_momentum(ticker=ticker, timeframe=timeframe)
-            # print(f"MOMM_SIGNAL {ticker} {timeframe}: {mommentum_trend.value} -> regime: {regime.value}")
             if mommentum_trend != TradeSide.NEUTRAL:
                 await send_hook(ticker=ticker, hook_name="MOMENTUM", direction=mommentum_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
 

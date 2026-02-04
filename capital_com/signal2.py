@@ -204,68 +204,147 @@ def signal_atr_hilo_breakout(
 
 
 
+# def signal_atr_momentum(
+#     ticker: str,
+#     timeframe="HOUR",
+#     atr_period=14,
+#     roc_period=5,
+#     roc_atr_thresh=1.5,
+#     range_atr_mult=1.0,
+#     stall_bars=3,
+# ):
+#     bars = [b for b in memory.get_history(ticker, timeframe)]
+#     min_required = max(atr_period, roc_period) + stall_bars + 5
+#     if len(bars) < min_required:
+#         return TradeSide.NEUTRAL
+
+#     df = pd.DataFrame(bars)
+#     closes = df["c"].values
+#     highs  = df["h"].values
+#     lows   = df["l"].values
+
+#     # ---- ATR ----
+#     atr = atr_from_df_v2(df, atr_period)
+#     if atr is None or atr == 0 or np.isnan(atr):
+#         return TradeSide.NEUTRAL
+
+#     last_close = closes[-1]
+#     prev_close = closes[-(roc_period + 1)]
+
+#     # ---- Vol-adjusted momentum ----
+#     roc_atr = (last_close - prev_close) / atr
+
+#     # ---- Expansion candle ----
+#     bar_range = highs[-1] - lows[-1]
+#     expansion = bar_range > range_atr_mult * atr
+
+#     # ---- Directional close ----
+#     close_pos = (last_close - lows[-1]) / max(bar_range, 1e-6)
+
+#     # ---- ENTRY ----
+#     if roc_atr > roc_atr_thresh and expansion and close_pos > 0.7:
+#         return TradeSide.LONG
+
+#     if roc_atr < -roc_atr_thresh and expansion and close_pos < 0.3:
+#         return TradeSide.SHORT
+
+#     # ---- INFER RECENT MOMENTUM DIRECTION ----
+#     recent_dir = None
+#     for i in range(-stall_bars - 1, -1):
+#         roc_i = (closes[i] - closes[i - roc_period]) / atr
+#         if roc_i > roc_atr_thresh:
+#             recent_dir = TradeSide.LONG
+#             break
+#         if roc_i < -roc_atr_thresh:
+#             recent_dir = TradeSide.SHORT
+#             break
+
+#     # ---- EXIT: momentum decay ----
+#     if recent_dir == TradeSide.LONG:
+#         if roc_atr < 0.5:
+#             return TradeSide.EXIT_LONG
+
+#     if recent_dir == TradeSide.SHORT:
+#         if roc_atr > -0.5:
+#             return TradeSide.EXIT_SHORT
+
+#     return TradeSide.NEUTRAL
+
+
+
+
+
+
 def signal_atr_momentum(
     ticker: str,
-    timeframe="HOUR",
+    timeframe="HOUR",          # Critical: match your actual trading TF
     atr_period=14,
     roc_period=5,
-    roc_atr_thresh=1.5,
-    range_atr_mult=1.0,
-    stall_bars=3,
+    entry_thresh=1.5,
+    exit_thresh=0.4,
+    persistence=2,              # ← Require N consecutive bars of decay
 ):
-    bars = [b for b in memory.get_history(ticker, timeframe)]
-    min_required = max(atr_period, roc_period) + stall_bars + 5
+    bars = list(memory.get_history(ticker, timeframe))
+    min_required = max(atr_period, roc_period) + 10
     if len(bars) < min_required:
         return TradeSide.NEUTRAL
 
     df = pd.DataFrame(bars)
     closes = df["c"].values
-    highs  = df["h"].values
-    lows   = df["l"].values
+    highs = df["h"].values
+    lows = df["l"].values
 
-    # ---- ATR ----
     atr = atr_from_df_v2(df, atr_period)
-    if atr is None or atr == 0 or np.isnan(atr):
+    if not atr or atr == 0 or np.isnan(atr):
         return TradeSide.NEUTRAL
 
-    last_close = closes[-1]
-    prev_close = closes[-(roc_period + 1)]
+    # ---- Momentum series (ROC normalized by ATR) ----
+    roc_series = np.array([
+        (closes[i] - closes[i - roc_period]) / atr
+        for i in range(roc_period, len(closes))
+    ])
 
-    # ---- Vol-adjusted momentum ----
-    roc_atr = (last_close - prev_close) / atr
+    last_roc = roc_series[-1]
 
-    # ---- Expansion candle ----
+    # ---- Expansion + close position (entry filters) ----
     bar_range = highs[-1] - lows[-1]
-    expansion = bar_range > range_atr_mult * atr
+    expansion = bar_range > 0.8 * atr
+    close_pos = (closes[-1] - lows[-1]) / max(bar_range, 1e-6)
 
-    # ---- Directional close ----
-    close_pos = (last_close - lows[-1]) / max(bar_range, 1e-6)
-
-    # ---- ENTRY ----
-    if roc_atr > roc_atr_thresh and expansion and close_pos > 0.7:
+    # ---- ENTRY: Require strong, confirmed momentum (2-bar) ----
+    if (len(roc_series) >= 2 and
+        roc_series[-1] > entry_thresh and roc_series[-2] > entry_thresh and
+        expansion and close_pos > 0.65):
         return TradeSide.LONG
 
-    if roc_atr < -roc_atr_thresh and expansion and close_pos < 0.3:
+    if (len(roc_series) >= 2 and
+        roc_series[-1] < -entry_thresh and roc_series[-2] < -entry_thresh and
+        expansion and close_pos < 0.35):
         return TradeSide.SHORT
 
-    # ---- INFER RECENT MOMENTUM DIRECTION ----
-    recent_dir = None
-    for i in range(-stall_bars - 1, -1):
-        roc_i = (closes[i] - closes[i - roc_period]) / atr
-        if roc_i > roc_atr_thresh:
-            recent_dir = TradeSide.LONG
-            break
-        if roc_i < -roc_atr_thresh:
-            recent_dir = TradeSide.SHORT
-            break
+    # ---- EXIT: Only if momentum was strong recently AND decayed persistently ----
+    # 1. Was momentum strong enough to have triggered an entry recently?
+    recent_peak = max(abs(roc_series[-5:])) if len(roc_series) >= 5 else 0
+    was_strong = recent_peak > entry_thresh * 0.8
 
-    # ---- EXIT: momentum decay ----
-    if recent_dir == TradeSide.LONG:
-        if roc_atr < 0.5:
-            return TradeSide.EXIT_LONG
+    if not was_strong:
+        return TradeSide.NEUTRAL  # No trade likely existed → no exit
 
-    if recent_dir == TradeSide.SHORT:
-        if roc_atr > -0.5:
-            return TradeSide.EXIT_SHORT
+    # 2. Has momentum decayed for N consecutive bars?
+    decayed_long = all(roc < exit_thresh for roc in roc_series[-persistence:])
+    decayed_short = all(roc > -exit_thresh for roc in roc_series[-persistence:])
+
+    # 3. Optional but recommended: price confirms decay via swing break
+    swing_high = highs[-6:-1].max() if len(highs) >= 7 else highs[-1]
+    swing_low = lows[-6:-1].min() if len(lows) >= 7 else lows[-1]
+    broke_swing_long = closes[-1] < swing_low
+    broke_swing_short = closes[-1] > swing_high
+
+    # ---- EXIT LOGIC ----
+    if decayed_long and broke_swing_long:
+        return TradeSide.EXIT_LONG
+
+    if decayed_short and broke_swing_short:
+        return TradeSide.EXIT_SHORT
 
     return TradeSide.NEUTRAL
