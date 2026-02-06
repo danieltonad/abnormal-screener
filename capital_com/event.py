@@ -7,7 +7,7 @@ def is_trading_session() -> bool:
     london_core = time(7, 30) <= now <= time(10, 30)
     ny_continuation = time(13, 30) <= now <= time(15, 30)
 
-    transition_blackout = time(15, 45) <= now <= time(17, 15)
+    transition_blackout = time(16, 45) <= now <= time(17, 15)
 
     return (london_core or ny_continuation) and not transition_blackout
 
@@ -44,7 +44,7 @@ async def faster_event_signal(ticker: str, timeframe: str):
 
         if timeframe == "MINUTE_30":
             amount = 10
-            profit, loss, trail_sl = amount*2, amount*2, amount//2
+            profit, loss, trail_sl = amount*2, amount, amount//2
             atr_side_trend = signal_atr_breakout_exit(ticker=ticker, timeframe=timeframe)
             if atr_side_trend != TradeSide.NEUTRAL:
                 await send_hook(ticker=ticker, hook_name="TREND", direction=atr_side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
@@ -52,7 +52,7 @@ async def faster_event_signal(ticker: str, timeframe: str):
         
         if timeframe == "MINUTE_15":
             amount = 5
-            profit, loss, trail_sl = amount*2, amount*2, amount//2
+            profit, loss, trail_sl = amount*2, amount*1.4, amount//2
             mommentum_trend = signal_atr_momentum(ticker=ticker, timeframe=timeframe)
             if mommentum_trend != TradeSide.NEUTRAL:
                 await send_hook(ticker=ticker, hook_name="MOMENTUM", direction=mommentum_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True)
