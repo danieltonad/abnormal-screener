@@ -12,6 +12,13 @@ class JobManager:
     async def start():
         from capital_com.socket_manager import capital_socket, memory
         from settings import settings
+
+        # events
+        scheduler.add_job(settings.update_tdv_events, IntervalTrigger(hours=2), id="update_tdv_events")
+        # scheduler.add_job(settings.update_tdv_classified_events, IntervalTrigger(minutes=15), id="update_tdv_classified_events")
+        scheduler.add_job(settings.update_tdv_next_event_minute, IntervalTrigger(minutes=5), id="update_tdv_next_event_minute")
+
+
         # Schedule periodic tasks
         scheduler.add_job(memory.update_auth_header, IntervalTrigger(minutes=5), id="update_auth_header")
         scheduler.add_job(capital_socket.ping_all, IntervalTrigger(minutes=5), id="ping_socket")
@@ -19,6 +26,9 @@ class JobManager:
         scheduler.start()
 
         await memory.update_auth_header()
+        await settings.update_tdv_events()
+        # await settings.update_tdv_classified_events()
+        settings.update_tdv_next_event_minute()
 
         await JobManager.subscribe_capital_list(settings=settings, memory=memory, capital_socket=capital_socket, max_concurrent=5)
 

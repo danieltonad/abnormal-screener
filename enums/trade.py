@@ -6,7 +6,12 @@ class TradeSide(Enum):
     NEUTRAL = "NEUTRAL"  
     EXIT_LONG = "EXIT_BUY"
     EXIT_SHORT = "EXIT_SELL"
-    
+
+
+class TradeMode(Enum):
+    DEMO = "DEMO"
+    LIVE = "LIVE"
+
 
 class TradeTimeFrame(Enum):
     ONE_MIN = "1m"

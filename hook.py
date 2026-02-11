@@ -1,5 +1,5 @@
 from httpx import AsyncClient
-from enums.trade import TradeSide
+from enums.trade import TradeSide, TradeMode
 import asyncio, random
 from datetime import datetime
 
@@ -13,11 +13,15 @@ class Colors:
     RED = "\033[91m"
     YELLOW = "\033[93m"
 
-async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, trail_sl: int, session: AsyncClient, mkt_closed: bool = False, recalibrate: bool = True, strategy: bool = False):
+async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, trail_sl: int, trade_mode: TradeMode, session: AsyncClient, mkt_closed: bool = False, recalibrate: bool = True, strategy: bool = False):
     from settings import settings
     ticker = settings.ticker_mask(ticker)
     if ticker not in settings.watchlist:
         return
+    
+    # gold exception 
+    # if ticker == "GOLD":
+    #     loss = 2 * loss
     
     url = "http://127.0.0.1:3556/webhook/trading-view"
     payload = {
@@ -30,7 +34,8 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
         "trail_sl": int(trail_sl),
         "exit_criteria": [
         "SL"
-        ]
+        ],
+        "trade_mode": trade_mode.value
     }
     if mkt_closed:
         payload["exit_criteria"].append("EOW_CLOSE")

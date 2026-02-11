@@ -1,13 +1,23 @@
 import os
 from dotenv import load_dotenv
 from httpx import AsyncClient
+from datetime import datetime, timezone, timedelta
+from capital_com.news.main import TdvEventService
+
+
+
 
 load_dotenv(override=True)
 
 
 class Settings:
-
+    news: TdvEventService = TdvEventService()
     def __init__(self):
+        self.news = TdvEventService()
+        self.TDV_EVENTS = []
+        self.TDV_CLASSIFIED_EVENTS = []
+        self.TDV_NEXT_EVENT_MINUTES = 999999
+        self.LAST_EVENT = None
         from smart_group import conjured_epic_list
         if not os.path.exists("watchlist.txt"):
             self.watchlist = set()
@@ -98,6 +108,53 @@ class Settings:
             # "UDN": "DXY",  
         }
         return tickers.get(ticker, ticker)  # Default to the ticker itself if not found
+    
+
+    async def update_tdv_events(self):
+        self.TDV_EVENTS = await self.news.get_events()
+        print("TDV EVENTS => ", len(self.TDV_EVENTS))
+    
+    async def update_tdv_classified_events(self):
+        self.TDV_CLASSIFIED_EVENTS = await self.news.get_classified_events()
+        print("TDV CLASSIFIED EVENTS => ", len(self.TDV_CLASSIFIED_EVENTS))
+    
+    def update_tdv_next_event_minute(self):
+        current_index = 0
+        for current_index, event in enumerate(self.TDV_EVENTS):
+            minutes_left = self.news.minutes_left(event.get("date"))
+            if 0 < minutes_left < self.TDV_NEXT_EVENT_MINUTES :
+                self.TDV_NEXT_EVENT_MINUTES = minutes_left
+                break
+        else:
+            self.TDV_NEXT_EVENT_MINUTES = 999999
+            self.LAST_EVENT = self.TDV_EVENTS[current_index -1].get("date") if current_index > 0 else None
+        print("TDV NEXT EVENT MINUTES => ", self.TDV_NEXT_EVENT_MINUTES)
+
+
+    def classified_event_today(self) -> bool:
+        now = datetime.utcnow()
+        today_str = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        for event in self.TDV_CLASSIFIED_EVENTS:
+            event_date = event.get("date", "")
+            if event_date.startswith(today_str):
+                return True
+        return False
+    
+
+    def is_within_minutes_range(iso_date_str: str, minutes: int) -> bool:
+        given_time = datetime.fromisoformat(
+            iso_date_str.replace("Z", "+00:00")
+        )
+        now = datetime.now(timezone.utc)
+
+        range_end = given_time + timedelta(minutes=minutes)
+
+        return now <= range_end
+
+
+
+
+
     
         
 

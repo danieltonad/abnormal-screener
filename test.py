@@ -3,19 +3,14 @@ from enums.trade import TradeTimeFrame, TradeSide
 from capital_com.event import is_trading_session
 
 async def test_play():
-    # from screeners.etfs.ema import double_ema_list
-    from screeners.crypto.ema import double_ema_list
-    from hook import send_bulk_hook
+    from capital_com.news.main import TdvEventService
+    news = TdvEventService()
 
-    # long = await double_ema_list(left=9, right=21, timeframe=TradeTimeFrame.ONE_MIN, side=TradeSide.LONG)
+    events = await news.get_events()
+    print(events)
 
-    # print("Long EMA List:", long)
 
-    # short = await double_ema_list(left=9, right=21, timeframe=TradeTimeFrame.ONE_MIN, side=TradeSide.SHORT)
-
-    # print("Short EMA List:", short)
-
-    await send_bulk_hook(tickers=["US100", "BTCUSD"], hook_name="9/21 EMA", direction=TradeSide.LONG, amount=50, profit=35, loss=7, mkt_closed=True)
+    # await send_bulk_hook(tickers=["US100", "BTCUSD"], hook_name="9/21 EMA", direction=TradeSide.LONG, amount=50, profit=35, loss=7, mkt_closed=True)
 
 
 # asyncio.run(test_play())
@@ -52,4 +47,5 @@ async def socket_test():
 
 
 
-asyncio.run(socket_test())
+# asyncio.run(socket_test())
+asyncio.run(test_play())
