@@ -5,7 +5,7 @@ from .socket import CapitalSocket, memory
 
 
 class CapitalSocketManager:
-    MAX_SUBSCRIPTIONS_PER_SOCKET = 40
+    MAX_SUBSCRIPTIONS_PER_SOCKET = 36
 
     def __init__(self):
         self.sockets = []
@@ -106,6 +106,7 @@ class CapitalSocketManager:
         # tell socket how to report death
         socket.on_close = self._handle_socket_close
         await socket.connect_websocket()
+        
 
         self.sockets.append(socket)
         self.socket_assignments[socket] = set()

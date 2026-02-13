@@ -53,9 +53,9 @@ class JobManager:
             await asyncio.sleep(0.3)  # small delay per sub
     
     async def subscribe_capital_list(settings, memory, capital_socket, max_concurrent=7):
-        await capital_socket.subscribe("BTCUSD", timeframe="MKT_DATA", ohlc=False)
-        await capital_socket.subscribe("GOLD", timeframe="MKT_DATA_GOLD", ohlc=False)
-        await capital_socket.subscribe("NFLX", timeframe="MKT_DATA_GOLD", ohlc=False)
+        # await capital_socket.subscribe("BTCUSD", timeframe="MKT_DATA", ohlc=False)
+        # await capital_socket.subscribe("GOLD", timeframe="MKT_DATA_GOLD", ohlc=False)
+        # await capital_socket.subscribe("NFLX", timeframe="MKT_DATA_GOLD", ohlc=False)
         sem = asyncio.Semaphore(max_concurrent)
         async def worker(epic):
             async with sem:

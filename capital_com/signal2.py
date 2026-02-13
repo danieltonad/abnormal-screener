@@ -92,36 +92,17 @@ def signal_atr_breakout_exit(
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# 
-def signal_atr_hilo_breakout(
+def signal_atr_momentum(
     ticker: str,
-    timeframe="DAY",
-    atr_period=20,
-    atr_mult=1.0,
-    ema_period=50,
-    swing_lookback=5,
-    exit_buffer_mult=0.25
+    timeframe="HOUR",
+    atr_period=14,
+    roc_period=5,
+    roc_atr_thresh=1.5,
+    range_atr_mult=1.0,
+    stall_bars=3,
 ):
     bars = [b for b in memory.get_history(ticker, timeframe)]
-    min_required = max(atr_period, ema_period, swing_lookback) + 20
+    min_required = max(atr_period, roc_period) + stall_bars + 5
     if len(bars) < min_required:
         return TradeSide.NEUTRAL
 
@@ -130,64 +111,49 @@ def signal_atr_hilo_breakout(
     highs  = df["h"].values
     lows   = df["l"].values
 
-    # ---- ATR (volatility buffer) ----
+    # ---- ATR ----
     atr = atr_from_df_v2(df, atr_period)
-    if atr is None or np.isnan(atr) or atr == 0:
+    if atr is None or atr == 0 or np.isnan(atr):
         return TradeSide.NEUTRAL
 
-    buffer = atr_mult * atr
-
-    # ---- EMA trend ----
-    ema_vals = ema(closes, ema_period)
     last_close = closes[-1]
-    current_ema = ema_vals[-1]
+    prev_close = closes[-(roc_period + 1)]
 
-    trend_up = last_close > current_ema
-    trend_down = last_close < current_ema
+    # ---- Vol-adjusted momentum ----
+    roc_atr = (last_close - prev_close) / atr
 
-    # ---- Swing levels (spike-resistant) ----
-    window_highs = highs[-(swing_lookback + 1):-1]
-    window_lows  = lows[-(swing_lookback + 1):-1]
+    # ---- Expansion candle ----
+    bar_range = highs[-1] - lows[-1]
+    expansion = bar_range > range_atr_mult * atr
 
-    swing_high = np.percentile(window_highs, 90)
-    swing_low  = np.percentile(window_lows, 10)
+    # ---- Directional close ----
+    close_pos = (last_close - lows[-1]) / max(bar_range, 1e-6)
 
-    # ---- ENTRY CONDITIONS ----
-    if trend_up and last_close > swing_high + buffer:
+    # ---- ENTRY ----
+    if roc_atr > roc_atr_thresh and expansion and close_pos > 0.7:
         return TradeSide.LONG
 
-    if trend_down and last_close < swing_low - buffer:
+    if roc_atr < -roc_atr_thresh and expansion and close_pos < 0.3:
         return TradeSide.SHORT
 
-    # ---- INFER LAST DIRECTION ----
-    recent_direction = None
-    lookback = swing_lookback * 3
+    # ---- INFER RECENT MOMENTUM DIRECTION ----
+    recent_dir = None
+    for i in range(-stall_bars - 1, -1):
+        roc_i = (closes[i] - closes[i - roc_period]) / atr
+        if roc_i > roc_atr_thresh:
+            recent_dir = TradeSide.LONG
+            break
+        if roc_i < -roc_atr_thresh:
+            recent_dir = TradeSide.SHORT
+            break
 
-    for i in range(-lookback, -1):
-        price = closes[i]
-        ema_i = ema_vals[i]
-
-        if price > ema_i:
-            rh = np.percentile(highs[i-(swing_lookback+1):i], 90)
-            if price > rh + buffer:
-                recent_direction = TradeSide.LONG
-                break
-
-        if price < ema_i:
-            rl = np.percentile(lows[i-(swing_lookback+1):i], 10)
-            if price < rl - buffer:
-                recent_direction = TradeSide.SHORT
-                break
-
-    # ---- EXIT CONDITIONS ----
-    exit_buffer = exit_buffer_mult * atr
-
-    if recent_direction == TradeSide.LONG:
-        if last_close < current_ema - exit_buffer:
+    # ---- EXIT: momentum decay ----
+    if recent_dir == TradeSide.LONG:
+        if roc_atr < 0.5:
             return TradeSide.EXIT_LONG
 
-    if recent_direction == TradeSide.SHORT:
-        if last_close > current_ema + exit_buffer:
+    if recent_dir == TradeSide.SHORT:
+        if roc_atr > -0.5:
             return TradeSide.EXIT_SHORT
 
     return TradeSide.NEUTRAL
@@ -204,147 +170,173 @@ def signal_atr_hilo_breakout(
 
 
 
-# def signal_atr_momentum(
-#     ticker: str,
-#     timeframe="HOUR",
-#     atr_period=14,
-#     roc_period=5,
-#     roc_atr_thresh=1.5,
-#     range_atr_mult=1.0,
-#     stall_bars=3,
-# ):
-#     bars = [b for b in memory.get_history(ticker, timeframe)]
-#     min_required = max(atr_period, roc_period) + stall_bars + 5
-#     if len(bars) < min_required:
-#         return TradeSide.NEUTRAL
-
-#     df = pd.DataFrame(bars)
-#     closes = df["c"].values
-#     highs  = df["h"].values
-#     lows   = df["l"].values
-
-#     # ---- ATR ----
-#     atr = atr_from_df_v2(df, atr_period)
-#     if atr is None or atr == 0 or np.isnan(atr):
-#         return TradeSide.NEUTRAL
-
-#     last_close = closes[-1]
-#     prev_close = closes[-(roc_period + 1)]
-
-#     # ---- Vol-adjusted momentum ----
-#     roc_atr = (last_close - prev_close) / atr
-
-#     # ---- Expansion candle ----
-#     bar_range = highs[-1] - lows[-1]
-#     expansion = bar_range > range_atr_mult * atr
-
-#     # ---- Directional close ----
-#     close_pos = (last_close - lows[-1]) / max(bar_range, 1e-6)
-
-#     # ---- ENTRY ----
-#     if roc_atr > roc_atr_thresh and expansion and close_pos > 0.7:
-#         return TradeSide.LONG
-
-#     if roc_atr < -roc_atr_thresh and expansion and close_pos < 0.3:
-#         return TradeSide.SHORT
-
-#     # ---- INFER RECENT MOMENTUM DIRECTION ----
-#     recent_dir = None
-#     for i in range(-stall_bars - 1, -1):
-#         roc_i = (closes[i] - closes[i - roc_period]) / atr
-#         if roc_i > roc_atr_thresh:
-#             recent_dir = TradeSide.LONG
-#             break
-#         if roc_i < -roc_atr_thresh:
-#             recent_dir = TradeSide.SHORT
-#             break
-
-#     # ---- EXIT: momentum decay ----
-#     if recent_dir == TradeSide.LONG:
-#         if roc_atr < 0.5:
-#             return TradeSide.EXIT_LONG
-
-#     if recent_dir == TradeSide.SHORT:
-#         if roc_atr > -0.5:
-#             return TradeSide.EXIT_SHORT
-
-#     return TradeSide.NEUTRAL
 
 
 
 
 
 
-def signal_atr_momentum(
+
+
+
+
+
+
+
+def signal_gold_intraday(
     ticker: str,
-    timeframe="HOUR",          # Critical: match your actual trading TF
+    timeframe="15",
     atr_period=14,
-    roc_period=5,
-    entry_thresh=1.5,
-    exit_thresh=0.4,
-    persistence=2,              # ← Require N consecutive bars of decay
+    ema_bias_period=20,
+    ema_exit_period=9,
+    range_lookback=12,
+    compression_lookback=20,
 ):
-    bars = list(memory.get_history(ticker, timeframe))
-    min_required = max(atr_period, roc_period) + 10
+    bars = [b for b in memory.get_history(ticker, timeframe)]
+    min_required = max(atr_period, ema_bias_period, compression_lookback) + 10
     if len(bars) < min_required:
         return TradeSide.NEUTRAL
 
+    closes = np.array([b["c"] for b in bars])
+    highs  = np.array([b["h"] for b in bars])
+    lows   = np.array([b["l"] for b in bars])
+
     df = pd.DataFrame(bars)
-    closes = df["c"].values
-    highs = df["h"].values
-    lows = df["l"].values
 
     atr = atr_from_df_v2(df, atr_period)
-    if not atr or atr == 0 or np.isnan(atr):
+    if atr is None or atr == 0:
         return TradeSide.NEUTRAL
 
-    # ---- Momentum series (ROC normalized by ATR) ----
-    roc_series = np.array([
-        (closes[i] - closes[i - roc_period]) / atr
-        for i in range(roc_period, len(closes))
-    ])
+    ema_bias = ema(closes, ema_bias_period)
+    ema_exit = ema(closes, ema_exit_period)
 
-    last_roc = roc_series[-1]
+    last_close = closes[-1]
+    current_bias = ema_bias[-1]
+    current_exit = ema_exit[-1]
 
-    # ---- Expansion + close position (entry filters) ----
-    bar_range = highs[-1] - lows[-1]
-    expansion = bar_range > 0.8 * atr
-    close_pos = (closes[-1] - lows[-1]) / max(bar_range, 1e-6)
+    trend_up = last_close > current_bias
+    trend_down = last_close < current_bias
 
-    # ---- ENTRY: Require strong, confirmed momentum (2-bar) ----
-    if (len(roc_series) >= 2 and
-        roc_series[-1] > entry_thresh and roc_series[-2] > entry_thresh and
-        expansion and close_pos > 0.65):
+    # --- VOL COMPRESSION ---
+    atr_series = df["h"] - df["l"]
+    atr_mean = atr_series[-compression_lookback:].mean()
+
+    is_compressed = atr < atr_mean * 0.8  # gold tolerates mild compression
+
+    # --- RANGE STRUCTURE ---
+    recent_high = highs[-(range_lookback+1):-1].max()
+    recent_low  = lows[-(range_lookback+1):-1].min()
+
+    buffer = atr * 1.2  # gold needs commitment
+
+    is_long = (
+        is_compressed and
+        trend_up and
+        last_close > recent_high + buffer
+    )
+
+    is_short = (
+        is_compressed and
+        trend_down and
+        last_close < recent_low - buffer
+    )
+
+    if is_long:
         return TradeSide.LONG
 
-    if (len(roc_series) >= 2 and
-        roc_series[-1] < -entry_thresh and roc_series[-2] < -entry_thresh and
-        expansion and close_pos < 0.35):
+    if is_short:
         return TradeSide.SHORT
 
-    # ---- EXIT: Only if momentum was strong recently AND decayed persistently ----
-    # 1. Was momentum strong enough to have triggered an entry recently?
-    recent_peak = max(abs(roc_series[-5:])) if len(roc_series) >= 5 else 0
-    was_strong = recent_peak > entry_thresh * 0.8
-
-    if not was_strong:
-        return TradeSide.NEUTRAL  # No trade likely existed → no exit
-
-    # 2. Has momentum decayed for N consecutive bars?
-    decayed_long = all(roc < exit_thresh for roc in roc_series[-persistence:])
-    decayed_short = all(roc > -exit_thresh for roc in roc_series[-persistence:])
-
-    # 3. Optional but recommended: price confirms decay via swing break
-    swing_high = highs[-6:-1].max() if len(highs) >= 7 else highs[-1]
-    swing_low = lows[-6:-1].min() if len(lows) >= 7 else lows[-1]
-    broke_swing_long = closes[-1] < swing_low
-    broke_swing_short = closes[-1] > swing_high
-
-    # ---- EXIT LOGIC ----
-    if decayed_long and broke_swing_long:
+    # --- EXIT LOGIC ---
+    # fast EMA exit
+    if trend_up and last_close < current_exit:
         return TradeSide.EXIT_LONG
 
-    if decayed_short and broke_swing_short:
+    if trend_down and last_close > current_exit:
+        return TradeSide.EXIT_SHORT
+
+    return TradeSide.NEUTRAL
+
+
+
+
+
+
+
+
+
+
+
+
+def signal_silver_intraday(
+    ticker: str,
+    timeframe="15",
+    atr_period=14,
+    ema_bias_period=20,
+    ema_exit_period=9,
+    range_lookback=15,
+    compression_lookback=25,
+):
+    bars = [b for b in memory.get_history(ticker, timeframe)]
+    min_required = max(atr_period, ema_bias_period, compression_lookback) + 10
+    if len(bars) < min_required:
+        return TradeSide.NEUTRAL
+
+    closes = np.array([b["c"] for b in bars])
+    highs  = np.array([b["h"] for b in bars])
+    lows   = np.array([b["l"] for b in bars])
+
+    df = pd.DataFrame(bars)
+
+    atr = atr_from_df_v2(df, atr_period)
+    if atr is None or atr == 0:
+        return TradeSide.NEUTRAL
+
+    ema_bias = ema(closes, ema_bias_period)
+    ema_exit = ema(closes, ema_exit_period)
+
+    last_close = closes[-1]
+    current_bias = ema_bias[-1]
+    current_exit = ema_exit[-1]
+
+    trend_up = last_close > current_bias
+    trend_down = last_close < current_bias
+
+    # --- STRONGER COMPRESSION REQUIRED ---
+    atr_series = df["h"] - df["l"]
+    atr_mean = atr_series[-compression_lookback:].mean()
+
+    is_compressed = atr < atr_mean * 0.7  # silver needs tighter coil
+
+    # --- RANGE ---
+    recent_high = highs[-(range_lookback+1):-1].max()
+    recent_low  = lows[-(range_lookback+1):-1].min()
+
+    buffer = atr * 1.8  # silver needs bigger displacement
+
+    is_long = (
+        is_compressed and
+        trend_up and
+        last_close > recent_high + buffer
+    )
+
+    is_short = (
+        is_compressed and
+        trend_down and
+        last_close < recent_low - buffer
+    )
+
+    if is_long:
+        return TradeSide.LONG
+
+    if is_short:
+        return TradeSide.SHORT
+
+    # --- EXIT ---
+    if trend_up and last_close < current_exit:
+        return TradeSide.EXIT_LONG
+
+    if trend_down and last_close > current_exit:
         return TradeSide.EXIT_SHORT
 
     return TradeSide.NEUTRAL

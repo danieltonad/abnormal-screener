@@ -129,6 +129,7 @@ class Settings:
             self.TDV_NEXT_EVENT_MINUTES = 999999
             self.LAST_EVENT = self.TDV_EVENTS[current_index -1].get("date") if current_index > 0 else None
         print("TDV NEXT EVENT MINUTES => ", self.TDV_NEXT_EVENT_MINUTES)
+        # print("TDV LAST EVENT => ", self.LAST_EVENT)
 
 
     def classified_event_today(self) -> bool:
@@ -141,9 +142,11 @@ class Settings:
         return False
     
 
-    def is_within_minutes_range(iso_date_str: str, minutes: int) -> bool:
+    def is_within_minutes_range(self,minutes: int) -> bool:
+        if not self.LAST_EVENT:
+            return False
         given_time = datetime.fromisoformat(
-            iso_date_str.replace("Z", "+00:00")
+            self.LAST_EVENT.replace("Z", "+00:00")
         )
         now = datetime.now(timezone.utc)
 
