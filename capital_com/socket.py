@@ -48,9 +48,10 @@ class CapitalSocket:
 
                 self.listener_task = asyncio.create_task(self._listen())
 
-                await self.subscribe_to_epic("BTCUSD", timeframe="MKT_DATA", ohlc=False)
-                await self.subscribe_to_epic("GOLD", timeframe="MKT_DATA_GOLD", ohlc=False)
-                await self.subscribe_to_epic("NFLX", timeframe="MKT_DATA_GOLD", ohlc=False)
+                # remove later
+                # await self.subscribe_to_epic("BTCUSD", timeframe="MKT_DATA", ohlc=False)
+                # await self.subscribe_to_epic("GOLD", timeframe="MKT_DATA_GOLD", ohlc=False)
+                # await self.subscribe_to_epic("NFLX", timeframe="MKT_DATA_GOLD", ohlc=False)
 
             except Exception as e:
                 await Logger.app_log(

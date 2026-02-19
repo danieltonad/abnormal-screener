@@ -221,7 +221,7 @@ def signal_gold_intraday(
     atr_series = df["h"] - df["l"]
     atr_mean = atr_series[-compression_lookback:].mean()
 
-    is_compressed = atr < atr_mean * 0.8  # gold tolerates mild compression
+    # is_compressed = atr < atr_mean * 0.8  # gold tolerates mild compression
 
     # --- RANGE STRUCTURE ---
     recent_high = highs[-(range_lookback+1):-1].max()
@@ -230,13 +230,13 @@ def signal_gold_intraday(
     buffer = atr * 1.2  # gold needs commitment
 
     is_long = (
-        is_compressed and
+        # is_compressed and
         trend_up and
         last_close > recent_high + buffer
     )
 
     is_short = (
-        is_compressed and
+        # is_compressed and
         trend_down and
         last_close < recent_low - buffer
     )

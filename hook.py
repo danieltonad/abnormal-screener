@@ -33,7 +33,7 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
         "loss": int(loss),
         "trail_sl": int(trail_sl),
         "exit_criteria": [
-        "SL"
+        "SL", "TP"
         ],
         "trade_mode": trade_mode.value
     }

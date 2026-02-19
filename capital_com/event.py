@@ -39,7 +39,7 @@ async def faster_event_signal(ticker: str, timeframe: str):
         if timeframe == "MINUTE_15":
             hook_name = "MOMENTUM"
             amount = 3
-            profit, loss, trail_sl = amount, amount, amount//2
+            profit, loss, trail_sl = amount*2, amount, amount//2
             mommentum_trend = signal_atr_momentum(ticker=ticker, timeframe=timeframe)
             if mommentum_trend != TradeSide.NEUTRAL:
                 if happen and mommentum_trend in [TradeSide.LONG, TradeSide.SHORT]:
@@ -56,7 +56,7 @@ async def faster_event_signal(ticker: str, timeframe: str):
         if timeframe == "MINUTE_30":
             hook_name = "TREND"
             amount = 6
-            profit, loss, trail_sl = amount, amount, amount//2
+            profit, loss, trail_sl = amount*2, amount, amount//2
             atr_side_trend = signal_atr_breakout_exit(ticker=ticker, timeframe=timeframe)
             if atr_side_trend != TradeSide.NEUTRAL:
                 if happen and atr_side_trend in [TradeSide.LONG, TradeSide.SHORT]:
@@ -101,7 +101,7 @@ async def gold_silver_signal(ticker: str, timeframe: str):
         session = AsyncClient()
 
         amount = 50
-        profit, loss, trail_sl = amount, amount, amount
+        profit, loss, trail_sl = amount*2, amount, amount//2
         min = "15" if timeframe == "MINUTE_15" else "30"
     
         gold_trend = signal_gold_intraday(ticker=ticker, timeframe=timeframe)

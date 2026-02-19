@@ -33,6 +33,7 @@ class CapitalSocketManager:
 
         # I/O outside lock
         await socket.subscribe_to_epic(epic, timeframe, ohlc=ohlc)
+        
 
     async def unsubscribe(self, epic: str, timeframe: str = "MINUTE"):
         async with self.lock:
@@ -116,6 +117,9 @@ class CapitalSocketManager:
             message="New Capital socket created"
         )
 
+        await socket.subscribe_to_epic("BTCUSD", timeframe="MKT_DATA", ohlc=False)
+        await socket.subscribe_to_epic("GOLD", timeframe="MKT_DATA_GOLD", ohlc=False)
+        await socket.subscribe_to_epic("NFLX", timeframe="MKT_DATA_GOLD", ohlc=False)
         return socket
 
     async def _close_socket(self, socket: CapitalSocket):
