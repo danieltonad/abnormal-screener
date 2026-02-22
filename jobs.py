@@ -14,9 +14,8 @@ class JobManager:
         from settings import settings
 
         # events
-        scheduler.add_job(settings.update_tdv_events, IntervalTrigger(hours=2), id="update_tdv_events")
-        # scheduler.add_job(settings.update_tdv_classified_events, IntervalTrigger(minutes=15), id="update_tdv_classified_events")
-        scheduler.add_job(settings.update_tdv_next_event_minute, IntervalTrigger(minutes=5), id="update_tdv_next_event_minute")
+        # scheduler.add_job(settings.update_tdv_events, IntervalTrigger(hours=2), id="update_tdv_events")
+        # scheduler.add_job(settings.update_tdv_next_event_minute, IntervalTrigger(minutes=5), id="update_tdv_next_event_minute")
 
 
         # Schedule periodic tasks

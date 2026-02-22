@@ -32,7 +32,7 @@ async def faster_event_signal(ticker: str, timeframe: str):
         session = AsyncClient()
 
         happen = get_instrument_type(ticker) != EpicInstrument.CRYPTO and not is_trading_session()
-        news = settings.TDV_NEXT_EVENT_MINUTES < TDV_MINUTES_BUFFER or settings.is_within_minutes_range(TDV_MINUTES_BUFFER)
+        # news = settings.TDV_NEXT_EVENT_MINUTES < TDV_MINUTES_BUFFER or settings.is_within_minutes_range(TDV_MINUTES_BUFFER)
 
 
         
@@ -46,9 +46,9 @@ async def faster_event_signal(ticker: str, timeframe: str):
                     # print(f"Skipping {ticker} on {timeframe} due to market being closed.")
                     pass
                 else:
-                    if not news:
-                        await send_hook(ticker=ticker, hook_name=hook_name, direction=mommentum_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.LIVE)
-                        event_store.add_or_update(SignalLog(ticker=ticker, timeframe=timeframe, side=mommentum_trend, hook_name=hook_name))
+                    # if not news:
+                    await send_hook(ticker=ticker, hook_name=hook_name, direction=mommentum_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.LIVE)
+                    event_store.add_or_update(SignalLog(ticker=ticker, timeframe=timeframe, side=mommentum_trend, hook_name=hook_name))
 
         
         
@@ -63,15 +63,15 @@ async def faster_event_signal(ticker: str, timeframe: str):
                     # print(f"Skipping {ticker} on {timeframe} due to market being closed.")
                     pass
                 else:
-                    if not news:
-                        await asyncio.sleep(2)  # Small delay to ensure momentum signal is processed first
-                        side, _time = event_store.get(ticker=ticker, timeframe=timeframe, hook_name="MOMENTUM")
-                        if side == atr_side_trend and same_minute(_time):
-                            pass
-                        else:
-                            await send_hook(ticker=ticker, hook_name=hook_name, direction=atr_side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.LIVE)
-                        
-                        event_store.add_or_update(SignalLog(ticker=ticker, timeframe=timeframe, side=atr_side_trend, hook_name=hook_name))
+                    # if not news:
+                    await asyncio.sleep(2)  # Small delay to ensure momentum signal is processed first
+                    side, _time = event_store.get(ticker=ticker, timeframe=timeframe, hook_name="MOMENTUM")
+                    if side == atr_side_trend and same_minute(_time):
+                        pass
+                    else:
+                        await send_hook(ticker=ticker, hook_name=hook_name, direction=atr_side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.LIVE)
+                    
+                    event_store.add_or_update(SignalLog(ticker=ticker, timeframe=timeframe, side=atr_side_trend, hook_name=hook_name))
             
 
 
