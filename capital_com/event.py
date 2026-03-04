@@ -95,22 +95,18 @@ async def gold_silver_signal(ticker: str, timeframe: str):
     from hook import send_hook, AsyncClient
     from capital_com.signal2 import TradeSide, signal_gold_intraday, signal_silver_intraday
     try:
-        if ticker not in ["GOLD", "SILVER"]:
+        if ticker not in ["GOLD"]:
             return      
 
         session = AsyncClient()
 
         amount = 50
         profit, loss, trail_sl = amount*2, amount, amount//2
-        min = "15" if timeframe == "MINUTE_15" else "30"
+        hook_name = "SCALP"
     
         gold_trend = signal_gold_intraday(ticker=ticker, timeframe=timeframe)
         if gold_trend != TradeSide.NEUTRAL:
-            await send_hook(ticker=ticker, hook_name=f"SIG_{min}", direction=gold_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.DEMO)
-
-        silver_trend = signal_silver_intraday(ticker=ticker, timeframe=timeframe)
-        if silver_trend != TradeSide.NEUTRAL:
-            await send_hook(ticker=ticker, hook_name=f"SIG_{min}", direction=silver_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.DEMO)
+            await send_hook(ticker=ticker, hook_name=hook_name, direction=gold_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.DEMO)
 
         await session.aclose()
 
