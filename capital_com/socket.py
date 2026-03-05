@@ -143,7 +143,7 @@ class CapitalSocket:
     # ───────────────────────────────
 
     async def _listen(self):
-        from .event import faster_event_signal, gold_silver_signal
+        from .event import faster_event_signal, gold_signal
 
         try:
             while self.running:
@@ -181,7 +181,7 @@ class CapitalSocket:
                         p["priceType"]
                     )
                     
-                    await gold_silver_signal(
+                    await gold_signal(
                         p["epic"],
                         p["resolution"],
                         p["priceType"]

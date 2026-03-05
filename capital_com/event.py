@@ -92,7 +92,7 @@ async def faster_event_signal(ticker: str, timeframe: str, price_type: str):
 
 
 
-async def gold_silver_signal(ticker: str, timeframe: str, price_type: str):
+async def gold_signal(ticker: str, timeframe: str, price_type: str):
     from hook import send_hook, AsyncClient
     from capital_com.signal2 import TradeSide, signal_gold_intraday, signal_gold_brk, signal_gold_pullback
     try:
