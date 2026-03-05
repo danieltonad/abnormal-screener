@@ -13,7 +13,7 @@ class Colors:
     RED = "\033[91m"
     YELLOW = "\033[93m"
 
-async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, trail_sl: int, trade_mode: TradeMode, session: AsyncClient, mkt_closed: bool = False, recalibrate: bool = True, strategy: bool = False):
+async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, trail_sl: int, trade_mode: TradeMode, session: AsyncClient, mkt_closed: bool = False, recalibrate: bool = True, strategy: bool = False, multi_position: bool = False):
     from settings import settings
     ticker = settings.ticker_mask(ticker)
     if ticker not in settings.watchlist:
@@ -35,7 +35,8 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
         "exit_criteria": [
         "SL", "TP"
         ],
-        "trade_mode": trade_mode.value
+        "trade_mode": trade_mode.value,
+        "multi_position": multi_position
     }
     if mkt_closed:
         payload["exit_criteria"].append("EOW_CLOSE")
@@ -58,9 +59,3 @@ async def send_hook(ticker: str,  hook_name: str, direction: TradeSide, amount: 
     
     print(f"[{time}]: {hook_name} Hook | {ticker}: {res.status_code} -> {direction}")
 
-
-async def send_bulk_hook(tickers: list, hook_name: str, direction: TradeSide, amount: int, profit: int, loss: int, mkt_closed: bool = False):
-    async with AsyncClient() as session:
-        for ticker in tickers:
-            await send_hook(ticker, hook_name, direction, int(amount), int(profit), int(loss), session, mkt_closed)
-            await asyncio.sleep(random.uniform(0.1, 2.0))

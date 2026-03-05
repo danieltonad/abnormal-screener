@@ -49,7 +49,7 @@ class JobManager:
                 await capital_socket.subscribe(epic, timeframe=timeframe)
             except Exception as e:
                 print(f"Socket subscription failed for {epic} {timeframe}: {e}")
-            await asyncio.sleep(0.3)  # small delay per sub
+            await asyncio.sleep(1)  # small delay per sub
     
     async def subscribe_capital_list(settings, memory, capital_socket, max_concurrent=7):
         # await capital_socket.subscribe("BTCUSD", timeframe="MKT_DATA", ohlc=False)

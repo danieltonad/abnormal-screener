@@ -183,9 +183,36 @@ def signal_atr_momentum(
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# GOLD SIGNALS
+
+
+
+
+
 def signal_gold_intraday(
     ticker: str,
-    timeframe="15",
+    timeframe="MINUTE_5",
     atr_period=14,
     ema_bias_period=20,
     ema_exit_period=9,
@@ -261,32 +288,27 @@ def signal_gold_intraday(
 
 
 
-
-
-
-
-
-
-
-def signal_silver_intraday(
+def signal_gold_brk(
     ticker: str,
-    timeframe="15",
+    timeframe="MINUTE_5",
     atr_period=14,
-    ema_bias_period=20,
+    range_lookback=12,
+    compression_lookback=20,
+    ema_bias_period=50,
     ema_exit_period=9,
-    range_lookback=15,
-    compression_lookback=25,
 ):
+
     bars = [b for b in memory.get_history(ticker, timeframe)]
-    min_required = max(atr_period, ema_bias_period, compression_lookback) + 10
+    min_required = max(atr_period, compression_lookback) + 10
+
     if len(bars) < min_required:
         return TradeSide.NEUTRAL
 
-    closes = np.array([b["c"] for b in bars])
-    highs  = np.array([b["h"] for b in bars])
-    lows   = np.array([b["l"] for b in bars])
-
     df = pd.DataFrame(bars)
+
+    closes = np.array(df["c"])
+    highs  = np.array(df["h"])
+    lows   = np.array(df["l"])
 
     atr = atr_from_df_v2(df, atr_period)
     if atr is None or atr == 0:
@@ -296,47 +318,85 @@ def signal_silver_intraday(
     ema_exit = ema(closes, ema_exit_period)
 
     last_close = closes[-1]
-    current_bias = ema_bias[-1]
-    current_exit = ema_exit[-1]
 
-    trend_up = last_close > current_bias
-    trend_down = last_close < current_bias
+    trend_up = last_close > ema_bias[-1]
+    trend_down = last_close < ema_bias[-1]
 
-    # --- STRONGER COMPRESSION REQUIRED ---
-    atr_series = df["h"] - df["l"]
-    atr_mean = atr_series[-compression_lookback:].mean()
+    # compression detection
+    range_series = df["h"] - df["l"]
+    range_mean = range_series[-compression_lookback:].mean()
 
-    is_compressed = atr < atr_mean * 0.7  # silver needs tighter coil
+    compressed = atr < range_mean * 0.7
 
-    # --- RANGE ---
     recent_high = highs[-(range_lookback+1):-1].max()
     recent_low  = lows[-(range_lookback+1):-1].min()
 
-    buffer = atr * 1.8  # silver needs bigger displacement
-
-    is_long = (
-        is_compressed and
-        trend_up and
-        last_close > recent_high + buffer
-    )
-
-    is_short = (
-        is_compressed and
-        trend_down and
-        last_close < recent_low - buffer
-    )
-
-    if is_long:
+    if compressed and trend_up and last_close > recent_high + atr * 0.8:
         return TradeSide.LONG
 
-    if is_short:
+    if compressed and trend_down and last_close < recent_low - atr * 0.8:
         return TradeSide.SHORT
 
-    # --- EXIT ---
-    if trend_up and last_close < current_exit:
+    # early exit
+    if trend_up and last_close < ema_exit[-1]:
         return TradeSide.EXIT_LONG
 
-    if trend_down and last_close > current_exit:
+    if trend_down and last_close > ema_exit[-1]:
         return TradeSide.EXIT_SHORT
 
     return TradeSide.NEUTRAL
+
+
+
+
+def signal_gold_pullback(
+    ticker: str,
+    timeframe="MINUTE_5",
+    atr_period=14,
+    ema_trend_period=50,
+    ema_pull_period=20,
+    ema_exit_period=9,
+):
+
+    bars = [b for b in memory.get_history(ticker, timeframe)]
+
+    if len(bars) < ema_trend_period + 10:
+        return TradeSide.NEUTRAL
+
+    df = pd.DataFrame(bars)
+
+    closes = np.array(df["c"])
+    highs  = np.array(df["h"])
+    lows   = np.array(df["l"])
+
+    atr = atr_from_df_v2(df, atr_period)
+    if atr is None:
+        return TradeSide.NEUTRAL
+
+    ema_trend = ema(closes, ema_trend_period)
+    ema_pull  = ema(closes, ema_pull_period)
+    ema_exit  = ema(closes, ema_exit_period)
+
+    last_close = closes[-1]
+
+    slope = ema_trend[-1] - ema_trend[-5]
+
+    strong_uptrend = slope > atr * 0.03
+    strong_downtrend = slope < -atr * 0.03
+
+    if strong_uptrend and lows[-1] <= ema_pull[-1] and last_close > closes[-2]:
+        return TradeSide.LONG
+
+    if strong_downtrend and highs[-1] >= ema_pull[-1] and last_close < closes[-2]:
+        return TradeSide.SHORT
+
+    # early exit
+    if last_close < ema_exit[-1] and last_close > ema_trend[-1]:
+        return TradeSide.EXIT_LONG
+
+    if last_close > ema_exit[-1] and last_close < ema_trend[-1]:
+        return TradeSide.EXIT_SHORT
+
+    return TradeSide.NEUTRAL
+
+

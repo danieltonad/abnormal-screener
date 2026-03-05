@@ -163,6 +163,7 @@ class CapitalSocket:
                 if destination == "ohlc.event":
                     p = data["payload"]
 
+
                     memory.update_ohlc_data(
                         epic=p["epic"],
                         resolution=p["resolution"],
@@ -173,15 +174,17 @@ class CapitalSocket:
                         close=p["c"],
                         price_type=p["priceType"],
                     )
-
+                    
                     await faster_event_signal(
                         p["epic"],
-                        p["resolution"]
+                        p["resolution"],
+                        p["priceType"]
                     )
                     
                     await gold_silver_signal(
                         p["epic"],
-                        p["resolution"]
+                        p["resolution"],
+                        p["priceType"]
                     )
 
                 # else:

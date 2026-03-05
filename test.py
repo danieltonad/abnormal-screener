@@ -10,8 +10,6 @@ async def test_play():
     print(events)
 
 
-    # await send_bulk_hook(tickers=["US100", "BTCUSD"], hook_name="9/21 EMA", direction=TradeSide.LONG, amount=50, profit=35, loss=7, mkt_closed=True)
-
 
 # asyncio.run(test_play())
 

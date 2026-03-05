@@ -22,7 +22,7 @@ def same_minute(_time: datetime):
     return _time.strftime("%Y-%m-%d %H:%M") == datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
 
 
-async def faster_event_signal(ticker: str, timeframe: str):
+async def faster_event_signal(ticker: str, timeframe: str, price_type: str):
     from hook import send_hook, AsyncClient
     from leverage import get_leverage, get_instrument_type, EpicInstrument
     from capital_com.signal2 import TradeSide, signal_atr_breakout_exit, signal_atr_momentum
@@ -46,8 +46,8 @@ async def faster_event_signal(ticker: str, timeframe: str):
                     # print(f"Skipping {ticker} on {timeframe} due to market being closed.")
                     pass
                 else:
-                    # if not news:
-                    await send_hook(ticker=ticker, hook_name=hook_name, direction=mommentum_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.LIVE)
+                    if  price_type == "bid":
+                        await send_hook(ticker=ticker, hook_name=hook_name, direction=mommentum_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.LIVE)
                     event_store.add_or_update(SignalLog(ticker=ticker, timeframe=timeframe, side=mommentum_trend, hook_name=hook_name))
 
         
@@ -69,7 +69,8 @@ async def faster_event_signal(ticker: str, timeframe: str):
                     if side == atr_side_trend and same_minute(_time):
                         pass
                     else:
-                        await send_hook(ticker=ticker, hook_name=hook_name, direction=atr_side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.LIVE)
+                        if  price_type == "bid":
+                            await send_hook(ticker=ticker, hook_name=hook_name, direction=atr_side_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.LIVE)
                     
                     event_store.add_or_update(SignalLog(ticker=ticker, timeframe=timeframe, side=atr_side_trend, hook_name=hook_name))
             
@@ -91,22 +92,29 @@ async def faster_event_signal(ticker: str, timeframe: str):
 
 
 
-async def gold_silver_signal(ticker: str, timeframe: str):
+async def gold_silver_signal(ticker: str, timeframe: str, price_type: str):
     from hook import send_hook, AsyncClient
-    from capital_com.signal2 import TradeSide, signal_gold_intraday, signal_silver_intraday
+    from capital_com.signal2 import TradeSide, signal_gold_intraday, signal_gold_brk, signal_gold_pullback
     try:
-        if ticker not in ["GOLD"]:
+        if ticker != "GOLD" or timeframe in ["MINUTE_15", "MINUTE_30"]:
             return      
 
         session = AsyncClient()
 
         amount = 50
-        profit, loss, trail_sl = amount*2, amount, amount//2
-        hook_name = "SCALP"
+        profit, loss, trail_sl = amount*2, amount*3, amount//2
     
         gold_trend = signal_gold_intraday(ticker=ticker, timeframe=timeframe)
-        if gold_trend != TradeSide.NEUTRAL:
-            await send_hook(ticker=ticker, hook_name=hook_name, direction=gold_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.DEMO)
+        if gold_trend != TradeSide.NEUTRAL and price_type == "bid":
+            await send_hook(ticker=ticker, hook_name="SCALP", direction=gold_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.DEMO, multi_position=True)
+    
+        gold_trend = signal_gold_brk(ticker=ticker, timeframe=timeframe)
+        if gold_trend != TradeSide.NEUTRAL and price_type == "bid":
+            await send_hook(ticker=ticker, hook_name="BRK OUT", direction=gold_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.DEMO, multi_position=True)
+    
+        gold_trend = signal_gold_pullback(ticker=ticker, timeframe=timeframe)
+        if gold_trend != TradeSide.NEUTRAL and price_type == "bid":
+            await send_hook(ticker=ticker, hook_name="PULLBACK", direction=gold_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.DEMO, multi_position=True)
 
         await session.aclose()
 
