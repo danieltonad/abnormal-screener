@@ -101,20 +101,20 @@ async def gold_signal(ticker: str, timeframe: str, price_type: str):
 
         session = AsyncClient()
 
-        amount = 50
+        amount = 5
         profit, loss, trail_sl = amount*2, amount*3, amount//2
     
         gold_trend = signal_gold_intraday(ticker=ticker, timeframe=timeframe)
         if gold_trend != TradeSide.NEUTRAL and price_type == "bid":
-            await send_hook(ticker=ticker, hook_name="SCALP", direction=gold_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.DEMO, multi_position=True)
+            await send_hook(ticker=ticker, hook_name="SCALP", direction=gold_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.LIVE, multi_position=True)
     
         gold_trend = signal_gold_brk(ticker=ticker, timeframe=timeframe)
         if gold_trend != TradeSide.NEUTRAL and price_type == "bid":
-            await send_hook(ticker=ticker, hook_name="BRK OUT", direction=gold_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.DEMO, multi_position=True)
+            await send_hook(ticker=ticker, hook_name="BRK OUT", direction=gold_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.LIVE, multi_position=True)
     
         gold_trend = signal_gold_pullback(ticker=ticker, timeframe=timeframe)
         if gold_trend != TradeSide.NEUTRAL and price_type == "bid":
-            await send_hook(ticker=ticker, hook_name="PULLBACK", direction=gold_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.DEMO, multi_position=True)
+            await send_hook(ticker=ticker, hook_name="PULLBACK", direction=gold_trend, amount=amount, profit=profit, loss=loss, trail_sl=trail_sl, mkt_closed=True, session=session, strategy=True, trade_mode=TradeMode.LIVE, multi_position=True)
 
         await session.aclose()
 

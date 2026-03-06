@@ -175,11 +175,11 @@ class CapitalSocket:
                         price_type=p["priceType"],
                     )
                     
-                    await faster_event_signal(
-                        p["epic"],
-                        p["resolution"],
-                        p["priceType"]
-                    )
+                    # await faster_event_signal(
+                    #     p["epic"],
+                    #     p["resolution"],
+                    #     p["priceType"]
+                    # )
                     
                     await gold_signal(
                         p["epic"],
