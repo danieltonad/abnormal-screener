@@ -18,6 +18,14 @@ def is_trading_session() -> bool:
     return (london_core or ny_continuation) and not transition_blackout
 
 
+def gold_trading_session() -> bool:
+    now = datetime.now(timezone.utc).time()
+
+    london_full = time(7, 30) <= now <= time(12, 00)   # captures your 10-11 edge
+    ny_core     = time(14, 00) <= now <= time(17, 30)  # skips choppy open, catches 14-17
+
+    return london_full or ny_core
+
 def same_minute(_time: datetime):
     return _time.strftime("%Y-%m-%d %H:%M") == datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
 
@@ -97,7 +105,10 @@ async def gold_signal(ticker: str, timeframe: str, price_type: str):
     from capital_com.signal2 import TradeSide, signal_gold_intraday, signal_gold_brk, signal_gold_pullback
     try:
         if ticker != "GOLD" or timeframe in ["MINUTE_15", "MINUTE_30"]:
-            return      
+            return  
+
+        if not gold_trading_session():
+            return    
 
         session = AsyncClient()
 

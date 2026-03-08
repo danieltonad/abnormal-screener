@@ -1,6 +1,6 @@
 import asyncio
 from enums.trade import TradeTimeFrame, TradeSide
-from capital_com.event import is_trading_session
+from capital_com.event import is_trading_session, gold_trading_session
 
 async def test_play():
     from capital_com.news.main import TdvEventService
@@ -46,4 +46,6 @@ async def socket_test():
 
 
 # asyncio.run(socket_test())
-asyncio.run(test_play())
+# asyncio.run(test_play())
+
+print(gold_trading_session())
